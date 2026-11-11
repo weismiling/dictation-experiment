@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dictation Practice - Test Version (50 Questions)</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            line-height: 1.6;
+            font-size: 18px;
+        }
+
+        #root {
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #f5f5f5;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+        }
+
+        .question-number {
+            font-size: 14px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .button-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .button-primary:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .sentence {
+            font-size: 22px;
+            line-height: 1.8;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .inline-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #999;
+            min-width: 150px;
+            text-align: center;
+            padding: 0.5rem 0;
+            margin: 0 0.5rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 22px;
+            font-family: inherit;
+        }
+
+        .inline-input:focus {
+            outline: none;
+            border-bottom-color: #1976d2;
+            background: rgba(25, 118, 210, 0.05);
+        }
+
+        .feedback-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 3px solid #d32f2f;
+            background: #f5f5f5;
+        }
+
+        .segment {
+            display: inline;
+            margin: 0 2px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .segment-error {
+            color: #c62828;
+            text-decoration: underline wavy #d32f2f;
+            font-weight: 500;
+        }
+
+        .segment-error:hover {
+            background: rgba(211, 47, 47, 0.1);
+        }
+
+        .segment-suggestion {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .status-success {
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(76, 175, 80, 0.1);
+            color: #2e7d32;
+            text-align: center;
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+
+        .completion-screen {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .completion-screen h2 {
+            font-size: 28px;
+            color: #2e7d32;
+            margin-bottom: 1rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        .data-section {
+            background: #f9f9f9;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .data-section h3 {
+            color: #1a1a1a;
+            margin-bottom: 1rem;
+            font-size: 14px;
+        }
+
+        .copy-button {
+            background: #1976d2;
+            color: white;
+            margin-top: 1rem;
+            font-size: 12px;
+            padding: 0.5rem 1rem;
+        }
+
+        .copy-button:hover {
+            background: #1565c0;
+        }
+
+        .audio-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .test-banner {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid #fbc02d;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #f57f17;
+            font-weight: 500;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .export-buttons button {
+            font-size: 13px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const QUESTIONS = [
+            { word: 'concede', sentence: 'The government has ________ that the new tax policy has been a disaster.' },
+            { word: 'honorary', sentence: 'He\'s got a lot of ________ degrees and awards from educational establishments worldwide.' },
+            { word: 'accumulate', sentence: 'As people ________ more wealth, they tend to spend a greater proportion of their incomes.' },
+            { word: 'noticeable', sentence: 'Plant growth is most ________ in spring and early summer.' },
+            { word: 'orchestra', sentence: 'The ________ is to perform its last ever concert tomorrow night at the Albert Hall.' },
+            { word: 'ignorance', sentence: 'Public ________ about the disease is still a cause for concern.' },
+            { word: 'theoretical', sentence: 'The president does not want to answer any ________ questions.' },
+            { word: 'relevant', sentence: 'Education should be ________ to the child\'s needs.' },
+            { word: 'cemetery', sentence: 'His father is buried in the ________ on the hill.' },
+            { word: 'contemporary', sentence: 'Although the play was written hundreds of years ago, it still has a ________ feel to it.' },
+            { word: 'intelligence', sentence: 'He is blessed with both good looks and ________.' },
+            { word: 'propaganda', sentence: 'He was brought up on a diet of political ________ from birth.' },
+            { word: 'sufficient', sentence: 'This recipe should be ________ for five people.' },
+            { word: 'guidance', sentence: 'Young people don\'t always appreciate the ________ offered by their parents and teachers.' },
+            { word: 'consequence', sentence: 'Not making a will can have serious ________ for your children and other family members.' },
+            { word: 'principle', sentence: 'The country is run on socialist ________.' },
+            { word: 'appreciate', sentence: 'Any help you could give me would be greatly ________.' },
+            { word: 'revolutionary', sentence: 'He was arrested for taking part in ________ activities.' },
+            { word: 'extrovert', sentence: 'I think it helps if you have an ________ personality.' },
+            { word: 'feasible', sentence: 'With the extra resources, the project now seems ________.' },
+            { word: 'bizarre', sentence: 'That party was too ________ for me!' },
+            { word: 'committee', sentence: 'The finance ________ controls the school\'s budget.' },
+            { word: 'convenience', sentence: 'I like the ________ of living close to work.' },
+            { word: 'compatible', sentence: 'It was when we started living together that we found we just weren\'t ________.' },
+            { word: 'extraordinary', sentence: 'He told the ________ story of his escape.' },
+            { word: 'humorous', sentence: 'He told one or two ________ stories about his years as a policeman.' },
+            { word: 'immediately', sentence: 'We really ought to leave ________.' },
+            { word: 'independent', sentence: 'An ________ inquiry will determine whether the case should move forward.' },
+            { word: 'pursue', sentence: 'He decided to ________ a career in television.' },
+            { word: 'competent', sentence: 'She has shown herself to be a highly ________ manager.' },
+            { word: 'consciousness', sentence: 'The children have no ________ of being different.' },
+            { word: 'calendar', sentence: 'An old ________ for 2012 was still hanging on the wall of her office.' },
+            { word: 'consensus', sentence: 'The general ________ in the office is that he can\'t do his job.' },
+            { word: 'disappear', sentence: 'The sun ________ behind heavy clouds.' },
+            { word: 'disappoint', sentence: 'I\'m sorry to ________ you, but I\'m afraid I can\'t come after all.' },
+            { word: 'disastrous', sentence: 'Such a war would be ________ for the country.' },
+            { word: 'hierarchy', sentence: 'Some monkeys have a very complex social ________.' },
+            { word: 'occasion', sentence: 'We met on several ________ to discuss the issue.' },
+            { word: 'privilege', sentence: 'I had the ________ of interviewing Picasso in the 1960s.' },
+            { word: 'refrigerator', sentence: 'Store fruit juice in the ________.' },
+            { word: 'embarrass', sentence: 'I didn\'t want to ________ her in front of her friends.' },
+            { word: 'separate', sentence: 'The art department and the music department are in two ________ buildings.' },
+            { word: 'apologize', sentence: 'She ________ for her husband’s rudeness.' },
+            { word: 'foreseeable', sentence: 'I\'ll be living here for the ________ future.' },
+            { word: 'irresistible', sentence: 'She gave me one of those ________ smiles and I just had to agree.' },
+            { word: 'millennium', sentence: 'Imagine what the world will be like at the end of the next ________.' },
+            { word: 'pronunciation', sentence: 'There are two different ________ of this word.' },
+            { word: 'questionnaire', sentence: 'Visitors to the country have been asked to fill out a detailed ________.' },
+            { word: 'definitely', sentence: 'He ________ said he\'d be here.' },
+            { word: 'occurrence', sentence: 'Death was an everyday ________ during the Civil War.' }
+        ];
+
+        // 可接受的形式：只要原词拼写正确，单复数、过去式等词尾变化都算正确
+        function getAllWordForms(word) {
+            const w = word.toLowerCase();
+            const forms = new Set();
+            ['', 's', 'es', 'd', 'ed', 'ing', 'er', 'ers'].forEach(t => forms.add(w + t));
+            if (w.endsWith('e')) {
+                const stem = w.slice(0, -1);
+                ['ing', 'ed', 'er', 'ers', 'es', 's'].forEach(t => forms.add(stem + t));
+            }
+            if (w.endsWith('y')) {
+                const stem = w.slice(0, -1) + 'i';
+                ['es', 'ed', 'er', 'ers'].forEach(t => forms.add(stem + t));
+            }
+            return Array.from(forms);
+        }
+
+        // 字符级对齐比较（LCS 对齐，缺字母留空，之后的字母重新对齐）
+        function compareWordsCharByChar(correctWord, inputWord) {
+            const c = correctWord.toLowerCase();
+            const t = inputWord.toLowerCase();
+            const n = c.length, m = t.length;
+            // dp[i][j] = c[i..] 与 t[j..] 的最长公共子序列长度
+            const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+            for (let i = n - 1; i >= 0; i--) {
+                for (let j = m - 1; j >= 0; j--) {
+                    dp[i][j] = c[i] === t[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+                }
+            }
+            const result = [];
+            let i = 0, j = 0;
+            while (i < n || j < m) {
+                if (i < n && j < m && c[i] === t[j]) {
+                    result.push({ correct: correctWord[i], input: inputWord[j], match: true });
+                    i++; j++;
+                } else if (i < n && (j >= m || dp[i + 1][j] >= dp[i][j + 1])) {
+                    // 正确拼写中的字母在输入中缺失
+                    result.push({ correct: correctWord[i], input: ' ', match: false, missing: true });
+                    i++;
+                } else {
+                    // 输入中多出的字母
+                    result.push({ correct: '', input: inputWord[j], match: false, extra: true });
+                    j++;
+                }
+            }
+            // 相邻的"缺字母 + 多字母"合并为一个替换位置（如 e→a）
+            const merged = [];
+            for (let k = 0; k < result.length; k++) {
+                const cur = result[k], nxt = result[k + 1];
+                if (cur.missing && nxt && nxt.extra) {
+                    merged.push({ correct: cur.correct, input: nxt.input, match: false });
+                    k++;
+                } else if (cur.extra && nxt && nxt.missing) {
+                    merged.push({ correct: nxt.correct, input: cur.input, match: false });
+                    k++;
+                } else {
+                    merged.push(cur);
+                }
+            }
+            return merged;
+        }
+
+        // 点击某一列后，用该列的正确字母替换，其余列保持不变
+        function buildInputFromColumns(columns, clickedIdx) {
+            let s = '';
+            columns.forEach((col, k) => {
+                if (k === clickedIdx) s += col.correct;
+                else if (!col.missing) s += col.input;
+            });
+            return s;
+        }
+
+        function DictationTest() {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [userInput, setUserInput] = useState('');
+            const [feedback, setFeedback] = useState(null);
+            const [stats, setStats] = useState({ correct: 0, total: 0 });
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [isCompleted, setIsCompleted] = useState(false);
+            const [testData, setTestData] = useState(null);
+            const inputRef = useRef(null);
+            const userId = useRef(`user_${Date.now()}`);
+
+            const currentQuestion = QUESTIONS[currentIndex];
+            const progress = ((currentIndex + 1) / QUESTIONS.length) * 100;
+
+            useEffect(() => {
+                if (inputRef.current) {
+                    setTimeout(() => inputRef.current.focus(), 100);
+                }
+                
+                const timer = setTimeout(() => {
+                    handlePlayAudio();
+                }, 2000);
+                
+                return () => clearTimeout(timer);
+            }, [currentIndex]);
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter') {
+                    if (feedback && feedback.type === 'correct') {
+                        handleNext();
+                    } else if (userInput.trim()) {
+                        handleSubmit();
+                    }
+                }
+            };
+
+            const handleSubmit = () => {
+                if (userInput.trim() === '') return;
+
+                const acceptableForms = getAllWordForms(currentQuestion.word);
+                const isCorrect = acceptableForms.some(form => form.toLowerCase() === userInput.toLowerCase());
+
+                if (isCorrect) {
+                    setFeedback({ type: 'correct' });
+                    setStats(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
+                } else {
+                    const comparison = compareWordsCharByChar(currentQuestion.word, userInput);
+                    setFeedback({ type: 'spelling_error', comparison: comparison });
+                    setStats(prev => ({ ...prev, total: prev.total + 1 }));
+                }
+            };
+
+            const handleSegmentClick = (segIdx) => {
+                if (feedback && feedback.type === 'spelling_error') {
+                    const segment = feedback.comparison[segIdx];
+                    if (segment) {
+                        const newInput = buildInputFromColumns(feedback.comparison, segIdx);
+                        setUserInput(newInput);
+                        
+                        setTimeout(() => {
+                            const acceptableForms = getAllWordForms(currentQuestion.word);
+                            const isCorrect = acceptableForms.some(form => form.toLowerCase() === newInput.toLowerCase());
+                            
+                            if (isCorrect) {
+                                setFeedback({ type: 'correct' });
+                                setStats(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
+                            } else {
+                                const comparison = compareWordsCharByChar(currentQuestion.word, newInput);
+                                setFeedback({ type: 'spelling_error', comparison: comparison });
+                            }
+                        }, 50);
+                    }
+                }
+            };
+
+            // 一键替换：点击后输入框替换为正确拼写，并按正确处理
+            const handleReplaceWithCorrect = () => {
+                setUserInput(currentQuestion.word);
+                setFeedback({ type: 'correct', replaced: true });
+                setStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+            };
+
+            const handleNext = () => {
+                if (feedback && feedback.type === 'correct') {
+                    if (currentIndex === QUESTIONS.length - 1) {
+                        const finalData = {
+                            userId: userId.current,
+                            testMode: true,
+                            totalQuestions: QUESTIONS.length,
+                            correctAnswers: stats.correct + 1,
+                            accuracy: Math.round(((stats.correct + 1) / QUESTIONS.length) * 100),
+                            timestamp: new Date().toISOString(),
+                            questions: QUESTIONS
+                        };
+                        setTestData(finalData);
+                        setIsCompleted(true);
+                    } else {
+                        setCurrentIndex(currentIndex + 1);
+                        setUserInput('');
+                        setFeedback(null);
+                    }
+                }
+            };
+
+            const handlePlayAudio = () => {
+                setIsPlaying(true);
+                const audioUrl = `https://raw.githubusercontent.com/weismiling/audio-listening-experiment/main/audio/${currentQuestion.word}.mp3`;
+                const audio = new Audio(audioUrl);
+                audio.playbackRate = 0.9;
+                audio.onended = () => setIsPlaying(false);
+                audio.onerror = () => setIsPlaying(false);
+                audio.play();
+            };
+
+            const downloadJSON = () => {
+                const dataStr = JSON.stringify(testData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `test_data_${testData.userId}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+            };
+
+            const copyToClipboard = () => {
+                const dataStr = JSON.stringify(testData, null, 2);
+                navigator.clipboard.writeText(dataStr).then(() => {
+                    alert('✓ Data copied to clipboard!');
+                });
+            };
+
+            // ========== 完成页面 ==========
+            if (isCompleted) {
+                return (
+                    <div className="container">
+                        <div className="test-banner">🧪 TEST MODE - 50 Questions</div>
+                        <div className="card">
+                            <div className="completion-screen">
+                                <h2>✅ Test Complete!</h2>
+                                <p style={{ fontSize: '20px', marginBottom: '2rem', color: '#666' }}>
+                                    All 50 questions done
+                                </p>
+
+                                <div className="stats">
+                                    <div className="stat-item">
+                                        <div className="stat-number">{testData.correctAnswers}</div>
+                                        <div className="stat-label">Correct</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="stat-number">{QUESTIONS.length - testData.correctAnswers}</div>
+                                        <div className="stat-label">Errors</div>
+                                    </div>
+                                    <div className="stat-item">
+                                        <div className="stat-number">{testData.accuracy}%</div>
+                                        <div className="stat-label">Accuracy</div>
+                                    </div>
+                                </div>
+
+                                <div className="data-section">
+                                    <h3>📊 Test Data (Auto-saved locally)</h3>
+                                    <pre>{JSON.stringify(testData, null, 2).substring(0, 500)}...</pre>
+                                    
+                                    <div className="export-buttons">
+                                        <button className="button-primary" onClick={downloadJSON}>
+                                            ⬇️ Download as JSON
+                                        </button>
+                                        <button className="button-primary" onClick={copyToClipboard}>
+                                            📋 Copy to Clipboard
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <p style={{ marginTop: '2rem', fontSize: '11px', color: '#666' }}>
+                                    User: {testData.userId}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ========== 答题页面 ==========
+            return (
+                <div className="container">
+                    <div className="test-banner">🧪 TEST MODE - 50 Questions (Local Testing)</div>
+
+                    <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                    </div>
+
+                    <div className="card">
+                        <div className="question-number">Question {currentIndex + 1} of {QUESTIONS.length}</div>
+
+                        <div className="audio-controls">
+                            <button 
+                                className="button-primary" 
+                                onClick={handlePlayAudio}
+                                disabled={isPlaying}
+                            >
+                                {isPlaying ? '🔊 Playing...' : '🔊 Play Audio'}
+                            </button>
+                        </div>
+
+                        <div className="sentence">
+                            {currentQuestion.sentence.split('________')[0]}
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={userInput}
+                                onChange={(e) => setUserInput(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                                className="inline-input"
+                                placeholder="type here"
+                            />
+                            {currentQuestion.sentence.split('________')[1]}
+                        </div>
+
+                        {feedback && feedback.type === 'correct' && !feedback.replaced && (
+                            <div className="status-success">✓ Correct!</div>
+                        )}
+
+                        {feedback && feedback.type === 'spelling_error' && (
+                            <div className="feedback-section">
+                                <div style={{ fontSize: '14px', marginBottom: '0.75rem', color: '#666', fontWeight: '600' }}>
+                                    Your spelling:
+                                </div>
+                                <div style={{ marginBottom: '1.5rem', fontSize: '20px', fontFamily: 'Monaco, monospace' }}>
+                                    {feedback.comparison.map((seg, idx) => (
+                                        <React.Fragment key={idx}>
+                                            <span 
+                                                className={`segment ${seg.match ? '' : 'segment-error'}`}
+                                            >
+                                                {seg.input}
+                                            </span>
+                                            {idx < feedback.comparison.length - 1 && <span style={{ color: '#999', opacity: 0.4, margin: '0 2px' }}>|</span>}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+
+                                <div style={{ fontSize: '14px', marginBottom: '0.75rem', color: '#666', fontWeight: '600' }}>
+                                    Correct spelling:
+                                </div>
+                                <div style={{ marginBottom: '1rem', fontSize: '20px', fontFamily: 'Monaco, monospace' }}>
+                                    {feedback.comparison.map((seg, idx) => (
+                                        <React.Fragment key={idx}>
+                                            <span 
+                                                className={`segment ${seg.match ? '' : 'segment-suggestion'}`}
+                                            >
+                                                {seg.correct}
+                                            </span>
+                                            {idx < feedback.comparison.length - 1 && <span style={{ color: '#999', opacity: 0.4, margin: '0 2px' }}>|</span>}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+
+                                <button
+                                    className="button-primary"
+                                    onClick={handleReplaceWithCorrect}
+                                    style={{ marginTop: '0.5rem', background: '#1976d2' }}
+                                >
+                                    🔁 Replace with correct spelling
+                                </button>
+                            </div>
+                        )}
+
+                        {feedback && (
+                            <button 
+                                className="button-primary" 
+                                onClick={handleNext}
+                                style={{ marginTop: '2rem', width: '100%' }}
+                            >
+                                {currentIndex === QUESTIONS.length - 1 ? 'Finish Test →' : 'Next Question →'}
+                            </button>
+                        )}
+                    </div>
+
+                    <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: '1rem' }}>
+                        {stats.correct} / {Math.max(stats.total, 1)} correct
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<DictationTest />, document.getElementById('root'));
+    </script>
+</body>
+</html>
