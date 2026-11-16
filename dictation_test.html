@@ -7,6 +7,8 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -256,6 +258,30 @@
             max-height: 200px;
             overflow-y: auto;
         }
+        .upload-status {
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+
+        .upload-success {
+            background: rgba(76, 175, 80, 0.1);
+            color: #2e7d32;
+        }
+
+        .upload-error {
+            background: rgba(211, 47, 47, 0.1);
+            color: #c62828;
+        }
+
+        .upload-uploading {
+            background: rgba(25, 118, 210, 0.1);
+            color: #1976d2;
+        }
+
     </style>
 </head>
 <body>
@@ -264,8 +290,31 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyABPS87c_8CnEfsMiuWfWmSFl0wrOIwBuo",
+            authDomain: "dictation-experiment.firebaseapp.com",
+            projectId: "dictation-experiment",
+            storageBucket: "dictation-experiment.firebasestorage.app",
+            messagingSenderId: "133046248660",
+            appId: "1:133046248660:web:7af799b88fed0b4f0f0741"
+        };
+
+        let db = null;
+
+        // 初始化Firebase
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            console.log('✓ Firebase initialized');
+        } catch (error) {
+            console.error('Firebase error:', error);
+        }
+
         const QUESTIONS = [
-            { word: 'concede', sentence: 'The government has ________ that the new tax policy has been a disaster.' },
+            { word: 'concede', sentence: 'The government has ________ that the new tax policy has been a disaster.', accept: ['concede', 'conceded'] },
             { word: 'honorary', sentence: 'He\'s got a lot of ________ degrees and awards from educational establishments worldwide.' },
             { word: 'accumulate', sentence: 'As people ________ more wealth, they tend to spend a greater proportion of their incomes.' },
             { word: 'noticeable', sentence: 'Plant growth is most ________ in spring and early summer.' },
@@ -279,9 +328,9 @@
             { word: 'propaganda', sentence: 'He was brought up on a diet of political ________ from birth.' },
             { word: 'sufficient', sentence: 'This recipe should be ________ for five people.' },
             { word: 'guidance', sentence: 'Young people don\'t always appreciate the ________ offered by their parents and teachers.' },
-            { word: 'consequence', sentence: 'Not making a will can have serious ________ for your children and other family members.' },
-            { word: 'principle', sentence: 'The country is run on socialist ________.' },
-            { word: 'appreciate', sentence: 'Any help you could give me would be greatly ________.' },
+            { word: 'consequence', sentence: 'Not making a will can have serious ________ for your children and other family members.', accept: ['consequence', 'consequences'] },
+            { word: 'principle', sentence: 'The country is run on socialist ________.', accept: ['principle', 'principles'] },
+            { word: 'appreciate', sentence: 'Any help you could give me would be greatly ________.', accept: ['appreciate', 'appreciated'] },
             { word: 'revolutionary', sentence: 'He was arrested for taking part in ________ activities.' },
             { word: 'extrovert', sentence: 'I think it helps if you have an ________ personality.' },
             { word: 'feasible', sentence: 'With the extra resources, the project now seems ________.' },
@@ -298,39 +347,29 @@
             { word: 'consciousness', sentence: 'The children have no ________ of being different.' },
             { word: 'calendar', sentence: 'An old ________ for 2012 was still hanging on the wall of her office.' },
             { word: 'consensus', sentence: 'The general ________ in the office is that he can\'t do his job.' },
-            { word: 'disappear', sentence: 'The sun ________ behind heavy clouds.' },
+            { word: 'disappear', sentence: 'The sun ________ behind heavy clouds.', accept: ['disappear', 'disappeared'] },
             { word: 'disappoint', sentence: 'I\'m sorry to ________ you, but I\'m afraid I can\'t come after all.' },
             { word: 'disastrous', sentence: 'Such a war would be ________ for the country.' },
             { word: 'hierarchy', sentence: 'Some monkeys have a very complex social ________.' },
-            { word: 'occasion', sentence: 'We met on several ________ to discuss the issue.' },
+            { word: 'occasion', sentence: 'We met on several ________ to discuss the issue.', accept: ['occasion', 'occasions'] },
             { word: 'privilege', sentence: 'I had the ________ of interviewing Picasso in the 1960s.' },
             { word: 'refrigerator', sentence: 'Store fruit juice in the ________.' },
             { word: 'embarrass', sentence: 'I didn\'t want to ________ her in front of her friends.' },
             { word: 'separate', sentence: 'The art department and the music department are in two ________ buildings.' },
-            { word: 'apologize', sentence: 'She ________ for her husband’s rudeness.' },
+            { word: 'apologize', sentence: 'She ________ for her husband’s rudeness.', accept: ['apologize', 'apologized'] },
             { word: 'foreseeable', sentence: 'I\'ll be living here for the ________ future.' },
             { word: 'irresistible', sentence: 'She gave me one of those ________ smiles and I just had to agree.' },
             { word: 'millennium', sentence: 'Imagine what the world will be like at the end of the next ________.' },
-            { word: 'pronunciation', sentence: 'There are two different ________ of this word.' },
+            { word: 'pronunciation', sentence: 'There are two different ________ of this word.', accept: ['pronunciation', 'pronunciations'] },
             { word: 'questionnaire', sentence: 'Visitors to the country have been asked to fill out a detailed ________.' },
             { word: 'definitely', sentence: 'He ________ said he\'d be here.' },
             { word: 'occurrence', sentence: 'Death was an everyday ________ during the Civil War.' }
         ];
 
-        // 可接受的形式：只要原词拼写正确，单复数、过去式等词尾变化都算正确
+        // 只接受指定的形式：8 个空格允许过去式/原型或单数/复数，其余只接受原词
         function getAllWordForms(word) {
-            const w = word.toLowerCase();
-            const forms = new Set();
-            ['', 's', 'es', 'd', 'ed', 'ing', 'er', 'ers'].forEach(t => forms.add(w + t));
-            if (w.endsWith('e')) {
-                const stem = w.slice(0, -1);
-                ['ing', 'ed', 'er', 'ers', 'es', 's'].forEach(t => forms.add(stem + t));
-            }
-            if (w.endsWith('y')) {
-                const stem = w.slice(0, -1) + 'i';
-                ['es', 'ed', 'er', 'ers'].forEach(t => forms.add(stem + t));
-            }
-            return Array.from(forms);
+            const q = QUESTIONS.find(x => x.word === word);
+            return q && q.accept ? q.accept : [word];
         }
 
         // 字符级对齐比较（LCS 对齐，缺字母留空，之后的字母重新对齐）
@@ -395,25 +434,131 @@
             const [stats, setStats] = useState({ correct: 0, total: 0 });
             const [isPlaying, setIsPlaying] = useState(false);
             const [isCompleted, setIsCompleted] = useState(false);
-            const [testData, setTestData] = useState(null);
+            const [summary, setSummary] = useState(null);
+            const [uploadState, setUploadState] = useState({ pending: 0, sending: 0 });
             const inputRef = useRef(null);
-            const userId = useRef(`user_${Date.now()}`);
+
+            // 参与者信息（来自Prolific URL参数）
+            const prolificId = useRef((() => {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('PROLIFIC_PID') || params.get('pid') || `user_${Date.now()}`;
+            })());
+            const studyInfo = useRef((() => {
+                const params = new URLSearchParams(window.location.search);
+                return { studyId: params.get('STUDY_ID') || null, sessionId: params.get('SESSION_ID') || null };
+            })());
+            const startedAt = useRef(Date.now());
+
+            // 日志：qlog = 当前题的过程记录；records = 已完成题的记录；uploadQueue = 待上传队列
+            const qlog = useRef(null);
+            const records = useRef([]);
+            const uploadQueue = useRef([]);
 
             const currentQuestion = QUESTIONS[currentIndex];
             const progress = ((currentIndex + 1) / QUESTIONS.length) * 100;
 
             useEffect(() => {
+                qlog.current = {
+                    qNumber: currentIndex + 1,
+                    targetWord: QUESTIONS[currentIndex].word,
+                    shownAt: Date.now(),
+                    submissions: [],
+                    firstFeedbackAt: null,
+                    replace: null,
+                    audioPlays: [],
+                };
+
                 if (inputRef.current) {
-                    setTimeout(() => inputRef.current.focus(), 100);
+                    setTimeout(() => inputRef.current && inputRef.current.focus(), 100);
                 }
-                
+
                 const timer = setTimeout(() => {
                     handlePlayAudio();
                 }, 2000);
-                
+
                 return () => clearTimeout(timer);
             }, [currentIndex]);
 
+            // ---------- 上传（每题一条 + 完成后一条汇总；失败保留在队列中重试）----------
+            const refreshUploadState = () => {
+                setUploadState({
+                    pending: uploadQueue.current.length,
+                    sending: uploadQueue.current.filter(item => item.sending).length,
+                });
+            };
+
+            const flushUploadQueue = () => {
+                if (db) {
+                    uploadQueue.current.forEach(item => {
+                        if (item.sending) return;
+                        item.sending = true;
+                        const timeout = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('timeout')), 15000));
+                        Promise.race([db.collection('experiments').add(item.data), timeout])
+                            .then(() => {
+                                uploadQueue.current = uploadQueue.current.filter(x => x !== item);
+                            })
+                            .catch(err => {
+                                item.sending = false;
+                                console.error('Upload failed, will retry:', err);
+                            })
+                            .finally(refreshUploadState);
+                    });
+                }
+                refreshUploadState();
+            };
+
+            const enqueueUpload = (data) => {
+                uploadQueue.current.push({ data: data, sending: false });
+                flushUploadQueue();
+            };
+
+            useEffect(() => {
+                window.addEventListener('online', flushUploadQueue);
+                return () => window.removeEventListener('online', flushUploadQueue);
+            }, []);
+
+            // ---------- 构建单题记录 ----------
+            const diffMs = (from, to) => (from !== null && to !== null ? to - from : null);
+
+            const buildQuestionRecord = (log, nextAt) => {
+                const subs = log.submissions;
+                const firstSub = subs[0];
+                const firstSubmitAt = firstSub.t;
+                const replaceAt = log.replace ? log.replace.t : null;
+                const correctAtNext = !!log.replace || subs[subs.length - 1].correct;
+
+                return {
+                    type: 'question',
+                    group: 'test',
+                    prolificId: prolificId.current,
+                    studyId: studyInfo.current.studyId,
+                    sessionId: studyInfo.current.sessionId,
+                    qNumber: log.qNumber,
+                    targetWord: log.targetWord,
+                    shownAt: log.shownAt,
+                    nextAt: nextAt,
+                    submissions: subs,
+                    submissionCount: subs.length,
+                    firstSubmitCorrect: firstSub.correct,
+                    replaceClicked: !!log.replace,
+                    replace: log.replace,
+                    correctAtNext: correctAtNext,
+                    audioPlays: log.audioPlays,
+                    timing: {
+                        firstSubmitLatencyMs: diffMs(log.shownAt, firstSubmitAt),
+                        firstSubmitToNextMs: diffMs(firstSubmitAt, nextAt),
+                        firstFeedbackToNextMs: diffMs(log.firstFeedbackAt, nextAt),
+                        firstFeedbackToReplaceMs: diffMs(log.firstFeedbackAt, replaceAt),
+                        replaceToNextMs: diffMs(replaceAt, nextAt),
+                        retryIntervalsMs: subs.slice(1).map((s, i) => s.t - subs[i].t),
+                        questionTotalMs: nextAt - log.shownAt,
+                    },
+                    userAgent: navigator.userAgent,
+                };
+            };
+
+            // ---------- 交互 ----------
             const handleKeyPress = (e) => {
                 if (e.key === 'Enter') {
                     if (feedback && feedback.type === 'correct') {
@@ -427,8 +572,16 @@
             const handleSubmit = () => {
                 if (userInput.trim() === '') return;
 
+                const now = Date.now();
                 const acceptableForms = getAllWordForms(currentQuestion.word);
                 const isCorrect = acceptableForms.some(form => form.toLowerCase() === userInput.toLowerCase());
+
+                if (qlog.current) {
+                    qlog.current.submissions.push({ t: now, input: userInput, correct: isCorrect });
+                    if (qlog.current.firstFeedbackAt === null) {
+                        qlog.current.firstFeedbackAt = now;
+                    }
+                }
 
                 if (isCorrect) {
                     setFeedback({ type: 'correct' });
@@ -440,88 +593,105 @@
                 }
             };
 
-            const handleSegmentClick = (segIdx) => {
-                if (feedback && feedback.type === 'spelling_error') {
-                    const segment = feedback.comparison[segIdx];
-                    if (segment) {
-                        const newInput = buildInputFromColumns(feedback.comparison, segIdx);
-                        setUserInput(newInput);
-                        
-                        setTimeout(() => {
-                            const acceptableForms = getAllWordForms(currentQuestion.word);
-                            const isCorrect = acceptableForms.some(form => form.toLowerCase() === newInput.toLowerCase());
-                            
-                            if (isCorrect) {
-                                setFeedback({ type: 'correct' });
-                                setStats(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
-                            } else {
-                                const comparison = compareWordsCharByChar(currentQuestion.word, newInput);
-                                setFeedback({ type: 'spelling_error', comparison: comparison });
-                            }
-                        }, 50);
-                    }
-                }
-            };
-
-            // 一键替换：点击后输入框替换为正确拼写，并按正确处理
+            // 一键替换：点击后输入框替换为正确拼写，并按正确处理（计为正确）
             const handleReplaceWithCorrect = () => {
+                if (qlog.current) {
+                    qlog.current.replace = { t: Date.now(), typedBefore: userInput };
+                }
                 setUserInput(currentQuestion.word);
                 setFeedback({ type: 'correct', replaced: true });
                 setStats(prev => ({ ...prev, correct: prev.correct + 1 }));
             };
 
             const handleNext = () => {
-                if (feedback && feedback.type === 'correct') {
-                    if (currentIndex === QUESTIONS.length - 1) {
-                        const finalData = {
-                            userId: userId.current,
-                            testMode: true,
-                            totalQuestions: QUESTIONS.length,
-                            correctAnswers: stats.correct + 1,
-                            accuracy: Math.round(((stats.correct + 1) / QUESTIONS.length) * 100),
-                            timestamp: new Date().toISOString(),
-                            questions: QUESTIONS
-                        };
-                        setTestData(finalData);
-                        setIsCompleted(true);
-                    } else {
-                        setCurrentIndex(currentIndex + 1);
-                        setUserInput('');
-                        setFeedback(null);
-                    }
+                if (!feedback || feedback.type !== 'correct' || !qlog.current) return;
+
+                const nextAt = Date.now();
+                const record = buildQuestionRecord(qlog.current, nextAt);
+                qlog.current = null;
+                records.current.push(record);
+                enqueueUpload(record);
+
+                if (currentIndex === QUESTIONS.length - 1) {
+                    const correctCount = records.current.filter(r => r.correctAtNext).length;
+                    const finalSummary = {
+                        group: 'test',
+                        prolificId: prolificId.current,
+                        studyId: studyInfo.current.studyId,
+                        sessionId: studyInfo.current.sessionId,
+                        startedAt: startedAt.current,
+                        completedAt: nextAt,
+                        totalDurationMs: nextAt - startedAt.current,
+                        totalQuestions: QUESTIONS.length,
+                        correctAnswers: correctCount,
+                        firstTryCorrect: records.current.filter(r => r.firstSubmitCorrect).length,
+                        replaceCount: records.current.filter(r => r.replaceClicked).length,
+                        accuracy: Math.round((correctCount / QUESTIONS.length) * 100),
+                        userAgent: navigator.userAgent,
+                    };
+                    enqueueUpload({ type: 'summary', ...finalSummary });
+                    setSummary(finalSummary);
+                    setIsCompleted(true);
+                } else {
+                    setCurrentIndex(currentIndex + 1);
+                    setUserInput('');
+                    setFeedback(null);
                 }
             };
 
             const handlePlayAudio = () => {
+                if (qlog.current) {
+                    qlog.current.audioPlays.push(Date.now());
+                }
                 setIsPlaying(true);
                 const audioUrl = `https://raw.githubusercontent.com/weismiling/audio-listening-experiment/main/audio/${currentQuestion.word}.mp3`;
                 const audio = new Audio(audioUrl);
                 audio.playbackRate = 0.9;
                 audio.onended = () => setIsPlaying(false);
                 audio.onerror = () => setIsPlaying(false);
-                audio.play();
+                const playPromise = audio.play();
+                if (playPromise && playPromise.catch) {
+                    // 浏览器阻止了自动播放（第一题尚未有用户点击）：恢复按钮，让参与者手动点击播放
+                    playPromise.catch(() => setIsPlaying(false));
+                }
             };
 
             const downloadJSON = () => {
-                const dataStr = JSON.stringify(testData, null, 2);
-                const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(dataBlob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `test_data_${testData.userId}.json`;
-                link.click();
+                const data = { summary: summary, questions: records.current };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `result_${prolificId.current}.json`;
+                a.click();
                 URL.revokeObjectURL(url);
             };
 
-            const copyToClipboard = () => {
-                const dataStr = JSON.stringify(testData, null, 2);
-                navigator.clipboard.writeText(dataStr).then(() => {
-                    alert('✓ Data copied to clipboard!');
-                });
+            // ========== 完成页面 ==========
+            const renderUploadStatus = () => {
+                if (uploadState.pending === 0) {
+                    return (
+                        <div className="upload-status upload-success">
+                            ✓ All results uploaded. You can now close this window or return to Prolific.
+                        </div>
+                    );
+                }
+                const sending = uploadState.sending > 0;
+                return (
+                    <div className={`upload-status ${sending ? 'upload-uploading' : 'upload-error'}`}>
+                        {sending
+                            ? 'Uploading results... please keep this page open.'
+                            : `${uploadState.pending} record(s) not uploaded yet. Please check your connection and retry.`}
+                        <div style={{ marginTop: '0.75rem' }}>
+                            <button className="button-primary" onClick={flushUploadQueue} style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '14px' }}>
+                                🔁 Retry upload
+                            </button>
+                        </div>
+                    </div>
+                );
             };
 
-            // ========== 完成页面 ==========
-            if (isCompleted) {
+            if (isCompleted && summary) {
                 return (
                     <div className="container">
                         <div className="test-banner">🧪 TEST MODE - 50 Questions</div>
@@ -534,35 +704,31 @@
 
                                 <div className="stats">
                                     <div className="stat-item">
-                                        <div className="stat-number">{testData.correctAnswers}</div>
+                                        <div className="stat-number">{summary.correctAnswers}</div>
                                         <div className="stat-label">Correct</div>
                                     </div>
                                     <div className="stat-item">
-                                        <div className="stat-number">{QUESTIONS.length - testData.correctAnswers}</div>
+                                        <div className="stat-number">{QUESTIONS.length - summary.correctAnswers}</div>
                                         <div className="stat-label">Errors</div>
                                     </div>
                                     <div className="stat-item">
-                                        <div className="stat-number">{testData.accuracy}%</div>
+                                        <div className="stat-number">{summary.accuracy}%</div>
                                         <div className="stat-label">Accuracy</div>
                                     </div>
                                 </div>
 
-                                <div className="data-section">
-                                    <h3>📊 Test Data (Auto-saved locally)</h3>
-                                    <pre>{JSON.stringify(testData, null, 2).substring(0, 500)}...</pre>
-                                    
-                                    <div className="export-buttons">
-                                        <button className="button-primary" onClick={downloadJSON}>
-                                            ⬇️ Download as JSON
-                                        </button>
-                                        <button className="button-primary" onClick={copyToClipboard}>
-                                            📋 Copy to Clipboard
-                                        </button>
-                                    </div>
-                                </div>
+                                {renderUploadStatus()}
+
+                                <button
+                                    className="button-primary"
+                                    onClick={downloadJSON}
+                                    style={{ marginTop: '0.75rem', background: '#1976d2' }}
+                                >
+                                    💾 Download Results (JSON)
+                                </button>
 
                                 <p style={{ marginTop: '2rem', fontSize: '11px', color: '#666' }}>
-                                    User: {testData.userId}
+                                    Participant ID: {prolificId.current}
                                 </p>
                             </div>
                         </div>
