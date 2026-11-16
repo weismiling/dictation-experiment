@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>实验数据导出（管理员）</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+    h2 { margin-bottom: 1rem; }
+    input { width: 100%; padding: 10px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
+    button { padding: 10px 16px; font-size: 15px; margin: 6px 6px 6px 0; cursor: pointer; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #status { margin: 16px 0; color: #555; min-height: 1.5em; }
+    .hidden { display: none; }
+</style>
+</head>
+<body>
+<h2>实验数据导出</h2>
+
+<div id="login">
+    <input id="email" type="email" placeholder="邮箱">
+    <input id="password" type="password" placeholder="密码">
+    <button id="loginBtn">登录</button>
+</div>
+
+<div id="panel" class="hidden">
+    <p id="status"></p>
+    <button id="loadBtn">读取数据</button>
+    <button id="jsonBtn" disabled>下载 JSON</button>
+    <button id="csvBtn" disabled>下载 CSV</button>
+    <button id="logoutBtn">退出登录</button>
+</div>
+
+<script>
+    // Firebase 配置（与实验页面相同）
+    const firebaseConfig = {
+        apiKey: "AIzaSyABPS87c_8CnEfsMiuWfWmSFl0wrOIwBuo",
+        authDomain: "dictation-experiment.firebaseapp.com",
+        projectId: "dictation-experiment",
+        storageBucket: "dictation-experiment.firebasestorage.app",
+        messagingSenderId: "133046248660",
+        appId: "1:133046248660:web:7af799b88fed0b4f0f0741"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let rows = [];
+    const $ = id => document.getElementById(id);
+    const setStatus = text => { $('status').textContent = text; };
+
+    auth.onAuthStateChanged(user => {
+        $('login').classList.toggle('hidden', !!user);
+        $('panel').classList.toggle('hidden', !user);
+        if (user) setStatus('已登录：' + user.email);
+    });
+
+    $('loginBtn').onclick = async () => {
+        try {
+            await auth.signInWithEmailAndPassword($('email').value, $('password').value);
+        } catch (e) {
+            alert('登录失败：' + e.message);
+        }
+    };
+
+    $('logoutBtn').onclick = () => auth.signOut();
+
+    $('loadBtn').onclick = async () => {
+        setStatus('读取中...');
+        try {
+            const snap = await db.collection('experiments').get();
+            rows = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            rows.sort((a, b) =>
+                (a.prolificId || '').localeCompare(b.prolificId || '') ||
+                (a.qNumber || 999) - (b.qNumber || 999));
+            const questions = rows.filter(r => r.type === 'question').length;
+            const summaries = rows.filter(r => r.type === 'summary').length;
+            setStatus(`共 ${rows.length} 条记录（题目 ${questions} 条，汇总 ${summaries} 条）`);
+            $('jsonBtn').disabled = false;
+            $('csvBtn').disabled = false;
+        } catch (e) {
+            setStatus('读取失败：' + e.message);
+        }
+    };
+
+    function download(filename, text, mime) {
+        const blob = new Blob([text], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+
+    $('jsonBtn').onclick = () => {
+        download(`experiments_${stamp()}.json`, JSON.stringify(rows, null, 2), 'application/json');
+    };
+
+    // 把嵌套对象展开为一层（如 timing.firstSubmitLatencyMs），数组保存为 JSON 字符串
+    function flatten(obj, prefix = '', out = {}) {
+        for (const [k, v] of Object.entries(obj)) {
+            const key = prefix ? `${prefix}.${k}` : k;
+            if (v && typeof v === 'object' && !Array.isArray(v)) {
+                flatten(v, key, out);
+            } else {
+                out[key] = Array.isArray(v) ? JSON.stringify(v) : v;
+            }
+        }
+        return out;
+    }
+
+    function toCSV(list) {
+        const flat = list.map(r => flatten(r));
+        const cols = [...new Set(flat.flatMap(r => Object.keys(r)))];
+        const esc = v => {
+            if (v === null || v === undefined) return '';
+            const s = String(v);
+            return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const lines = [cols.join(','), ...flat.map(r => cols.map(c => esc(r[c])).join(','))];
+        return '﻿' + lines.join('\r\n');   // BOM：Excel 打开中文不乱码
+    }
+
+    $('csvBtn').onclick = () => {
+        download(`experiments_${stamp()}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
+    };
+</script>
+</body>
+</html>
