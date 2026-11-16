@@ -379,8 +379,41 @@
             return s;
         }
 
-        // 问卷链接（问卷结束页再跳转到 Prolific 完成页面）—— 之后替换为真实链接
-        const QUESTIONNAIRE_URL = 'https://example.com/your-questionnaire';
+        // 实验结束后的问卷（题目和选项可直接修改）
+        // type: 'single' 单选，'text' 文本；optional: true 为可选题
+        const QUESTIONNAIRE = [
+            { id: 'age', type: 'single', text: 'What is your age group?',
+              options: ['18-24', '25-34', '35-44', '45-54', '55 or older', 'Prefer not to say'] },
+            { id: 'gender', type: 'single', text: 'What is your gender?',
+              options: ['Female', 'Male', 'Non-binary / other', 'Prefer not to say'] },
+            { id: 'native_language', type: 'text', text: 'What is your first (native) language?' },
+            { id: 'english_level', type: 'single', text: 'How would you rate your English proficiency?',
+              options: ['Beginner', 'Elementary', 'Intermediate', 'Upper-intermediate', 'Advanced', 'Native-like'] },
+            { id: 'english_years', type: 'single', text: 'For how many years have you studied English?',
+              options: ['Less than 3 years', '3-6 years', '7-10 years', 'More than 10 years'] },
+            { id: 'english_use', type: 'single', text: 'How often do you read or write in English?',
+              options: ['Rarely', 'About once a week', 'Several times a week', 'Every day'] },
+            { id: 'audio_device', type: 'single', text: 'What did you use to listen to the audio?',
+              options: ['Headphones or earphones', 'External speakers', 'Laptop or device built-in speakers', 'Other'] },
+            { id: 'noise', type: 'single', text: 'How noisy was your environment during the experiment?',
+              options: ['Very quiet', 'Somewhat quiet', 'Some background noise', 'Noisy'] },
+            { id: 'tool_use', type: 'single', text: 'During the task, did you use any other tool (dictionary, translator, spellchecker, AI tool)?',
+              options: ['Never', 'Once or twice', 'Several times', 'Frequently'] },
+            { id: 'difficulty', type: 'single', text: 'How difficult was the task overall?',
+              options: ['1 - Very easy', '2', '3', '4', '5 - Very difficult'] },
+            { id: 'confidence', type: 'single', text: 'How confident were you in your spelling overall?',
+              options: ['1 - Not confident at all', '2', '3', '4', '5 - Very confident'] },
+            { id: 'replace_helpful', type: 'single', text: 'How helpful was the "Replace with correct spelling" button?',
+              options: ['Not helpful', 'Somewhat helpful', 'Very helpful', 'I did not use it'] },
+            { id: 'technical', type: 'single', text: 'Did you experience any technical problems?',
+              options: ['No problems', 'Audio did not play', 'The page was slow or froze', 'Other'] },
+            { id: 'attention', type: 'single', text: 'To show you are paying attention, please select "Somewhat agree".',
+              options: ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Somewhat agree', 'Strongly agree'] },
+            { id: 'comments', type: 'text', optional: true, text: 'Any comments about the experiment?' },
+        ];
+
+        // 问卷完成后跳转到 Prolific 完成页面（把 XXXXXXXX 替换为你的完成码）
+        const PROLIFIC_COMPLETION_URL = 'https://app.prolific.com/submissions/complete?cc=XXXXXXXX';
 
         function DictationOnline() {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -390,6 +423,7 @@
             const [isPlaying, setIsPlaying] = useState(false);
             const [stage, setStage] = useState('intro'); // intro -> task -> saving
             const [summary, setSummary] = useState(null);
+            const [answers, setAnswers] = useState({});
             const [uploadState, setUploadState] = useState({ pending: 0, sending: 0 });
             const inputRef = useRef(null);
 
@@ -447,12 +481,24 @@
             useEffect(() => {
                 if (stage === 'saving' && summary && uploadState.pending === 0) {
                     const timer = setTimeout(() => {
-                        const sep = QUESTIONNAIRE_URL.includes('?') ? '&' : '?';
-                        window.location.href = QUESTIONNAIRE_URL + sep + 'PROLIFIC_PID=' + encodeURIComponent(prolificId.current);
+                        window.location.href = PROLIFIC_COMPLETION_URL;
                     }, 1500);
                     return () => clearTimeout(timer);
                 }
             }, [stage, summary, uploadState.pending]);
+
+            const handleSubmitQuestionnaire = () => {
+                enqueueUpload({
+                    type: 'questionnaire',
+                    group: 'control',
+                    prolificId: prolificId.current,
+                    studyId: studyInfo.current.studyId,
+                    sessionId: studyInfo.current.sessionId,
+                    completedAt: Date.now(),
+                    answers: answers,
+                });
+                setStage('saving');
+            };
 
             // ---------- 上传（每题一条 + 完成后一条汇总；失败保留在队列中重试）----------
             const refreshUploadState = () => {
@@ -574,6 +620,8 @@
                 setUserInput(currentQuestion.word);
                 setFeedback({ type: 'correct', replaced: true });
                 setStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+                // 替换后把焦点还给输入框，否则按 Enter 无法进入下一题
+                setTimeout(() => inputRef.current && inputRef.current.focus(), 0);
             };
 
             const handleNext = () => {
@@ -605,7 +653,7 @@
                     };
                     enqueueUpload({ type: 'summary', ...finalSummary });
                     setSummary(finalSummary);
-                    setStage('saving');
+                    setStage('questionnaire');
                 } else {
                     setCurrentIndex(currentIndex + 1);
                     setUserInput('');
@@ -646,7 +694,7 @@
                 if (uploadState.pending === 0) {
                     return (
                         <div className="upload-status upload-success">
-                            ✓ Saved. Redirecting to the questionnaire...
+                            ✓ Saved. Redirecting to Prolific...
                         </div>
                     );
                 }
@@ -716,7 +764,59 @@
                 );
             }
 
-            // ========== 保存中 → 自动跳转问卷 ==========
+            // ========== 实验后问卷 ==========
+            if (stage === 'questionnaire') {
+                const allAnswered = QUESTIONNAIRE.every(q => q.optional || (answers[q.id] && answers[q.id] !== ''));
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <h2 style={{ marginBottom: '0.5rem' }}>Final Questionnaire</h2>
+                            <p style={{ fontSize: '15px', color: '#666', marginBottom: '1.5rem' }}>
+                                Please answer the following questions. Questions marked "optional" can be left blank.
+                            </p>
+                            {QUESTIONNAIRE.map((q, idx) => (
+                                <div key={q.id} style={{ marginBottom: '1.5rem' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                                        {idx + 1}. {q.text}{q.optional ? ' (optional)' : ''}
+                                    </div>
+                                    {q.type === 'text' ? (
+                                        <textarea
+                                            value={answers[q.id] || ''}
+                                            onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                            style={{ width: '100%', minHeight: '80px', padding: '8px', fontSize: '16px', boxSizing: 'border-box' }}
+                                        />
+                                    ) : (
+                                        q.options.map(opt => (
+                                            <label key={opt} style={{ display: 'block', padding: '5px 0', cursor: 'pointer', fontSize: '16px' }}>
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value={opt}
+                                                    checked={answers[q.id] === opt}
+                                                    onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                                                    style={{ marginRight: '8px' }}
+                                                />
+                                                {opt}
+                                            </label>
+                                        ))
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                className="button-primary"
+                                onClick={handleSubmitQuestionnaire}
+                                disabled={!allAnswered}
+                                style={{ width: '100%', marginTop: '1rem' }}
+                            >
+                                Submit and continue
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ========== 保存中 → 自动跳转 Prolific ==========
             if (stage === 'saving' && summary) {
                 const failed = uploadState.pending > 0 && uploadState.sending === 0;
                 return (
