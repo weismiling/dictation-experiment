@@ -8,12 +8,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 680px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
     h2 { margin-bottom: 1rem; }
     input { width: 100%; padding: 10px; margin: 6px 0; font-size: 16px; box-sizing: border-box; }
     button { padding: 10px 16px; font-size: 15px; margin: 6px 6px 6px 0; cursor: pointer; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
     #status { margin: 16px 0; color: #555; min-height: 1.5em; }
+    .desc { font-size: 13px; color: #666; margin: 0 0 14px; line-height: 1.6; }
     .hidden { display: none; }
 </style>
 </head>
@@ -29,9 +30,18 @@
 <div id="panel" class="hidden">
     <p id="status"></p>
     <button id="loadBtn">读取数据</button>
-    <button id="jsonBtn" disabled>下载 JSON</button>
-    <button id="csvBtn" disabled>下载 CSV</button>
     <button id="logoutBtn">退出登录</button>
+
+    <div class="desc">
+        <b>① 逐次作答表</b>：每一行是一次操作（Enter1、Enter2、Replace、Next），含操作前后的答案和两次操作之间的修改过程。<br>
+        <b>② 题目表</b>：每一行是一道题的汇总。<br>
+        <b>③ 参与者表</b>：每一行是一个人的汇总，包含问卷答案和完成状态。<br>
+        <b>JSON</b>：原始数据，用于备份。
+    </div>
+    <button id="attemptsBtn" disabled>下载 ① 逐次作答表</button>
+    <button id="questionsBtn" disabled>下载 ② 题目表</button>
+    <button id="participantsBtn" disabled>下载 ③ 参与者表</button>
+    <button id="jsonBtn" disabled>下载 JSON（原始）</button>
 </div>
 
 <script>
@@ -73,18 +83,170 @@
         try {
             const snap = await db.collection('experiments').get();
             rows = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            rows.sort((a, b) =>
-                (a.prolificId || '').localeCompare(b.prolificId || '') ||
-                (a.qNumber || 999) - (b.qNumber || 999));
             const questions = rows.filter(r => r.type === 'question').length;
             const summaries = rows.filter(r => r.type === 'summary').length;
-            setStatus(`共 ${rows.length} 条记录（题目 ${questions} 条，汇总 ${summaries} 条）`);
-            $('jsonBtn').disabled = false;
-            $('csvBtn').disabled = false;
+            const quest = rows.filter(r => r.type === 'questionnaire').length;
+            setStatus(`共 ${rows.length} 条记录（题目 ${questions}，汇总 ${summaries}，问卷 ${quest}）`);
+            ['attemptsBtn', 'questionsBtn', 'participantsBtn', 'jsonBtn'].forEach(id => $(id).disabled = false);
         } catch (e) {
             setStatus('读取失败：' + e.message);
         }
     };
+
+    // ---------- 工具函数 ----------
+    const yn = b => (b === true ? '正确' : b === false ? '错误' : '');
+    const blank = v => (v === undefined || v === null ? '' : v);
+    const fmtTime = ms => (typeof ms === 'number'
+        ? new Date(ms).toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }) + '.' + String(ms % 1000).padStart(3, '0')
+        : '');
+
+    const byTypeSorted = type => rows
+        .filter(r => r.type === type)
+        .sort((a, b) => (a.group || '').localeCompare(b.group || '') ||
+            (a.prolificId || '').localeCompare(b.prolificId || '') ||
+            (a.qNumber || 0) - (b.qNumber || 0) || (a.completedAt || 0) - (b.completedAt || 0));
+
+    // ---------- ① 逐次作答表 ----------
+    function buildAttempts() {
+        const out = [];
+        byTypeSorted('question').forEach(q => {
+            const events = (q.events || []).slice().sort((a, b) => a.t - b.t);
+            let segment = [];              // 两次操作之间的输入变化
+            let lastT = q.shownAt;
+            let enterCount = 0;
+            events.forEach(ev => {
+                if (ev.type === 'input') { segment.push(ev.value); return; }
+                if (ev.type === 'audio') return;   // 音频在题目表里统计
+                let action, before = '', after = '', result = '';
+                if (ev.type === 'enter') {
+                    enterCount += 1;
+                    action = `Enter${enterCount}`;
+                    before = ev.before; after = ev.after; result = yn(ev.correct);
+                } else if (ev.type === 'replace') {
+                    action = 'Replace';
+                    before = ev.before; after = ev.after; result = '替换（计为正确）';
+                } else if (ev.type === 'next') {
+                    action = 'Next';
+                    after = ev.finalAnswer;
+                } else {
+                    return;
+                }
+                out.push({
+                    '参与者ID': q.prolificId,
+                    '组别': q.group,
+                    '题号': q.qNumber,
+                    '目标词': q.targetWord,
+                    '操作': action,
+                    '时间（东京）': fmtTime(ev.t),
+                    '距题目出现（ms）': ev.t - q.shownAt,
+                    '与上一操作间隔（ms）': ev.t - lastT,
+                    '修改过程（上次操作后的输入）': segment.join(' → '),
+                    '操作前答案': blank(before),
+                    '操作后答案': blank(after),
+                    '结果': result,
+                });
+                segment = [];
+                lastT = ev.t;
+            });
+        });
+        return out;
+    }
+
+    // ---------- ② 题目表 ----------
+    // 每题一行；Enter1/Enter2… 横向展开；时间统计以秒为单位
+    function buildQuestions() {
+        const qs = byTypeSorted('question');
+        const maxEnter = Math.max(1, ...qs.map(q => (q.submissions || []).length));
+        const sec = ms => (typeof ms === 'number' ? (ms / 1000).toFixed(2) : '');
+        return qs.map(q => {
+            const subs = q.submissions || [];
+            const events = q.events || [];
+            const row = {
+                '参与者ID': q.prolificId,
+                '组别': q.group,
+                '题号': q.qNumber,
+                '目标词': q.targetWord,
+            };
+            for (let i = 0; i < maxEnter; i++) {
+                row[`Enter${i + 1} 答案`] = subs[i] ? subs[i].input : '';
+                row[`Enter${i + 1} 结果`] = subs[i] ? yn(subs[i].correct) : '';
+            }
+            // 正确确定的时刻：点替换，或最后一次正确的 Enter
+            const correctT = q.replace ? q.replace.t : (subs.length ? subs[subs.length - 1].t : null);
+            const firstEnterT = subs.length ? subs[0].t : null;
+            row['是否点替换'] = q.replaceClicked ? '是' : '否';
+            row['替换前答案'] = q.replace ? blank(q.replace.typedBefore) : '';
+            row['音频播放次数'] = events.filter(e => e.type === 'audio').length;
+            row['题目显示时间（东京）'] = fmtTime(q.shownAt);
+            row['首次Enter前用时（秒）'] = firstEnterT ? sec(firstEnterT - q.shownAt) : '';
+            row['首次Enter到正确确定（秒）'] = (firstEnterT && correctT) ? sec(correctT - firstEnterT) : '';
+            row['本题总时长（秒）'] = (q.nextAt && q.shownAt) ? sec(q.nextAt - q.shownAt) : '';
+            return row;
+        });
+    }
+
+    // ---------- ③ 参与者表 ----------
+    const QLABELS = [
+        ['年龄', 'age'], ['性别', 'gender'], ['母语', 'native_language'],
+        ['英语水平', 'english_level'], ['学英语年数', 'english_years'],
+        ['读写英语频率', 'english_use'], ['听音设备', 'audio_device'],
+        ['环境噪音', 'noise'], ['使用其他工具', 'tool_use'],
+        ['任务难度', 'difficulty'], ['拼写信心', 'confidence'],
+        ['替换按钮是否有用', 'replace_helpful'], ['技术问题', 'technical'],
+        ['备注', 'comments'],
+    ];
+
+    function buildParticipants() {
+        const map = new Map();
+        rows.forEach(r => {
+            if (!['question', 'summary', 'questionnaire'].includes(r.type)) return;
+            const key = `${r.group}|${r.prolificId}`;
+            if (!map.has(key)) {
+                map.set(key, { group: r.group, id: r.prolificId, questions: [], summary: null, questionnaire: null });
+            }
+            const p = map.get(key);
+            if (r.type === 'question') p.questions.push(r);
+            if (r.type === 'summary') p.summary = r;
+            if (r.type === 'questionnaire') p.questionnaire = r;
+        });
+
+        return [...map.values()]
+            .sort((a, b) => (a.group || '').localeCompare(b.group || '') || (a.id || '').localeCompare(b.id || ''))
+            .map(p => {
+                const s = p.summary || {};
+                const ans = (p.questionnaire && p.questionnaire.answers) || {};
+                const out = {
+                    '参与者ID': p.id,
+                    '组别': p.group,
+                    '状态': p.summary
+                        ? (p.questionnaire ? '完成（含问卷）' : '完成（无问卷）')
+                        : `未完成（已答 ${p.questions.length} 题）`,
+                    '完成时间（东京）': fmtTime(s.completedAt),
+                    '总时长（分）': s.totalDurationMs ? (s.totalDurationMs / 60000).toFixed(1) : '',
+                    '正确题数': blank(s.correctAnswers),
+                    '正确率（%）': blank(s.accuracy),
+                    '第一次即正确题数': blank(s.firstTryCorrect),
+                    '替换次数': blank(s.replaceCount),
+                };
+                QLABELS.forEach(([label, key]) => { out[label] = blank(ans[key]); });
+                out['注意力检测是否通过'] = p.questionnaire
+                    ? (ans.attention === 'Somewhat agree' ? '通过' : '未通过') : '';
+                return out;
+            });
+    }
+
+    // ---------- CSV 输出 ----------
+    function toCSV(list) {
+        if (!list.length) return '﻿';
+        const cols = [...new Set(list.flatMap(r => Object.keys(r)))];
+        const esc = v => {
+            if (v === null || v === undefined) return '';
+            const s = String(v);
+            return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const lines = [cols.join(','), ...list.map(r => cols.map(c => esc(r[c])).join(','))];
+        return '﻿' + lines.join('\r\n');   // BOM：Excel 打开中文不乱码
+    }
 
     function download(filename, text, mime) {
         const blob = new Blob([text], { type: mime });
@@ -98,48 +260,10 @@
 
     const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
 
-    $('jsonBtn').onclick = () => {
-        download(`experiments_${stamp()}.json`, JSON.stringify(rows, null, 2), 'application/json');
-    };
-
-    // 把嵌套对象展开为一层（如 timing.firstSubmitLatencyMs），数组保存为 JSON 字符串
-    function flatten(obj, prefix = '', out = {}) {
-        for (const [k, v] of Object.entries(obj)) {
-            const key = prefix ? `${prefix}.${k}` : k;
-            if (v && typeof v === 'object' && !Array.isArray(v)) {
-                flatten(v, key, out);
-            } else {
-                out[key] = Array.isArray(v) ? JSON.stringify(v) : v;
-            }
-        }
-        return out;
-    }
-
-    const TIME_KEYS = ['shownAt', 'nextAt', 'startedAt', 'completedAt', 'replace.t'];
-    const jst = ms => new Date(ms).toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' });
-
-    function toCSV(list) {
-        const flat = list.map(r => {
-            const { _id, ...rest } = r;           // 去掉数据库内部编号
-            const f = flatten(rest);
-            TIME_KEYS.forEach(k => {               // 时间戳额外生成东京时间列
-                if (typeof f[k] === 'number') f[k + '_JST'] = jst(f[k]);
-            });
-            return f;
-        });
-        const cols = [...new Set(flat.flatMap(r => Object.keys(r)))];
-        const esc = v => {
-            if (v === null || v === undefined) return '';
-            const s = String(v);
-            return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-        };
-        const lines = [cols.join(','), ...flat.map(r => cols.map(c => esc(r[c])).join(','))];
-        return '﻿' + lines.join('\r\n');   // BOM：Excel 打开中文不乱码
-    }
-
-    $('csvBtn').onclick = () => {
-        download(`experiments_${stamp()}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
-    };
+    $('attemptsBtn').onclick = () => download(`1_逐次作答_${stamp()}.csv`, toCSV(buildAttempts()), 'text/csv;charset=utf-8');
+    $('questionsBtn').onclick = () => download(`2_题目_${stamp()}.csv`, toCSV(buildQuestions()), 'text/csv;charset=utf-8');
+    $('participantsBtn').onclick = () => download(`3_参与者_${stamp()}.csv`, toCSV(buildParticipants()), 'text/csv;charset=utf-8');
+    $('jsonBtn').onclick = () => download(`experiments_${stamp()}.json`, JSON.stringify(rows, null, 2), 'application/json');
 </script>
 </body>
 </html>
