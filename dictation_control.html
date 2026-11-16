@@ -379,13 +379,16 @@
             return s;
         }
 
+        // 问卷链接（问卷结束页再跳转到 Prolific 完成页面）—— 之后替换为真实链接
+        const QUESTIONNAIRE_URL = 'https://example.com/your-questionnaire';
+
         function DictationOnline() {
             const [currentIndex, setCurrentIndex] = useState(0);
             const [userInput, setUserInput] = useState('');
             const [feedback, setFeedback] = useState(null);
             const [stats, setStats] = useState({ correct: 0, total: 0 });
             const [isPlaying, setIsPlaying] = useState(false);
-            const [isCompleted, setIsCompleted] = useState(false);
+            const [stage, setStage] = useState('intro'); // intro -> task -> saving
             const [summary, setSummary] = useState(null);
             const [uploadState, setUploadState] = useState({ pending: 0, sending: 0 });
             const inputRef = useRef(null);
@@ -393,8 +396,9 @@
             // 参与者信息（来自Prolific URL参数）
             const prolificId = useRef((() => {
                 const params = new URLSearchParams(window.location.search);
-                return params.get('PROLIFIC_PID') || params.get('pid') || `user_${Date.now()}`;
+                return params.get('PROLIFIC_PID') || params.get('pid') || '';
             })());
+            const [pidInput, setPidInput] = useState(prolificId.current);
             const studyInfo = useRef((() => {
                 const params = new URLSearchParams(window.location.search);
                 return { studyId: params.get('STUDY_ID') || null, sessionId: params.get('SESSION_ID') || null };
@@ -410,14 +414,14 @@
             const progress = ((currentIndex + 1) / QUESTIONS.length) * 100;
 
             useEffect(() => {
+                if (stage !== 'task') return;
                 qlog.current = {
                     qNumber: currentIndex + 1,
                     targetWord: QUESTIONS[currentIndex].word,
                     shownAt: Date.now(),
                     submissions: [],
-                    firstFeedbackAt: null,
                     replace: null,
-                    audioPlays: [],
+                    events: [],
                 };
 
                 if (inputRef.current) {
@@ -429,7 +433,26 @@
                 }, 2000);
 
                 return () => clearTimeout(timer);
-            }, [currentIndex]);
+            }, [currentIndex, stage]);
+
+            const handleStart = () => {
+                const id = pidInput.trim();
+                if (!id) return;
+                prolificId.current = id;
+                startedAt.current = Date.now();
+                setStage('task');
+            };
+
+            // 上传全部成功后自动跳转问卷（未成功前不跳转，避免数据丢失）
+            useEffect(() => {
+                if (stage === 'saving' && summary && uploadState.pending === 0) {
+                    const timer = setTimeout(() => {
+                        const sep = QUESTIONNAIRE_URL.includes('?') ? '&' : '?';
+                        window.location.href = QUESTIONNAIRE_URL + sep + 'PROLIFIC_PID=' + encodeURIComponent(prolificId.current);
+                    }, 1500);
+                    return () => clearTimeout(timer);
+                }
+            }, [stage, summary, uploadState.pending]);
 
             // ---------- 上传（每题一条 + 完成后一条汇总；失败保留在队列中重试）----------
             const refreshUploadState = () => {
@@ -490,23 +513,19 @@
                     targetWord: log.targetWord,
                     shownAt: log.shownAt,
                     nextAt: nextAt,
-                    submissions: subs,
                     submissionCount: subs.length,
                     firstSubmitCorrect: firstSub.correct,
+                    correctAtNext: correctAtNext,
                     replaceClicked: !!log.replace,
                     replace: log.replace,
-                    correctAtNext: correctAtNext,
-                    audioPlays: log.audioPlays,
+                    submissions: subs,
+                    events: log.events,
                     timing: {
                         firstSubmitLatencyMs: diffMs(log.shownAt, firstSubmitAt),
                         firstSubmitToNextMs: diffMs(firstSubmitAt, nextAt),
-                        firstFeedbackToNextMs: diffMs(log.firstFeedbackAt, nextAt),
-                        firstFeedbackToReplaceMs: diffMs(log.firstFeedbackAt, replaceAt),
                         replaceToNextMs: diffMs(replaceAt, nextAt),
                         retryIntervalsMs: subs.slice(1).map((s, i) => s.t - subs[i].t),
-                        questionTotalMs: nextAt - log.shownAt,
                     },
-                    userAgent: navigator.userAgent,
                 };
             };
 
@@ -530,9 +549,9 @@
 
                 if (qlog.current) {
                     qlog.current.submissions.push({ t: now, input: userInput, correct: isCorrect });
-                    if (qlog.current.firstFeedbackAt === null) {
-                        qlog.current.firstFeedbackAt = now;
-                    }
+                    qlog.current.events.push({
+                        t: now, type: 'enter', before: userInput, after: userInput, correct: isCorrect,
+                    });
                 }
 
                 if (isCorrect) {
@@ -548,7 +567,9 @@
             // 一键替换：点击后输入框替换为正确拼写，并按正确处理（计为正确）
             const handleReplaceWithCorrect = () => {
                 if (qlog.current) {
-                    qlog.current.replace = { t: Date.now(), typedBefore: userInput };
+                    const now = Date.now();
+                    qlog.current.replace = { t: now, typedBefore: userInput, after: currentQuestion.word };
+                    qlog.current.events.push({ t: now, type: 'replace', before: userInput, after: currentQuestion.word });
                 }
                 setUserInput(currentQuestion.word);
                 setFeedback({ type: 'correct', replaced: true });
@@ -559,6 +580,7 @@
                 if (!feedback || feedback.type !== 'correct' || !qlog.current) return;
 
                 const nextAt = Date.now();
+                qlog.current.events.push({ t: nextAt, type: 'next', finalAnswer: userInput });
                 const record = buildQuestionRecord(qlog.current, nextAt);
                 qlog.current = null;
                 records.current.push(record);
@@ -583,7 +605,7 @@
                     };
                     enqueueUpload({ type: 'summary', ...finalSummary });
                     setSummary(finalSummary);
-                    setIsCompleted(true);
+                    setStage('saving');
                 } else {
                     setCurrentIndex(currentIndex + 1);
                     setUserInput('');
@@ -593,7 +615,7 @@
 
             const handlePlayAudio = () => {
                 if (qlog.current) {
-                    qlog.current.audioPlays.push(Date.now());
+                    qlog.current.events.push({ t: Date.now(), type: 'audio' });
                 }
                 setIsPlaying(true);
                 const audioUrl = `https://raw.githubusercontent.com/weismiling/audio-listening-experiment/main/audio/${currentQuestion.word}.mp3`;
@@ -624,7 +646,7 @@
                 if (uploadState.pending === 0) {
                     return (
                         <div className="upload-status upload-success">
-                            ✓ All results uploaded. You can now close this window or return to Prolific.
+                            ✓ Saved. Redirecting to the questionnaire...
                         </div>
                     );
                 }
@@ -643,42 +665,79 @@
                 );
             };
 
-            if (isCompleted && summary) {
+            // ========== 说明页 + Prolific ID 输入 ==========
+            if (stage === 'intro') {
                 return (
                     <div className="container">
-                        <div className="banner">🌐 Online Experiment - 50 Questions</div>
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <h2 style={{ marginBottom: '1.25rem' }}>Welcome to Audio Listening Experiment</h2>
+
+                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>📋 Experiment Instructions:</h3>
+                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
+                                <li>Duration: Approximately 20-30 minutes</li>
+                                <li>Structure: 100 audio questions in 2 phases (50 each)</li>
+                                <li>Task: Listen to audio and fill in the missing word</li>
+                                <li>Audio: Each audio will auto-play after 1 second and can be replayed as many times as needed</li>
+                                <li>Review: After Phase 1, there is a review stage where you can check your mistakes. Misspelled words are underlined in red, and clicking on them shows the correct spelling.</li>
+                                <li>Requirements: Use headphones for best audio quality</li>
+                            </ul>
+
+                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>⚠️ Important Notes:</h3>
+                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
+                                <li>To confirm task completion and analyze participant behavior, this experiment records all mouse clicks and interactions. The data will be used solely for research purposes.</li>
+                                <li>Please ensure you have a stable internet connection</li>
+                                <li>Use headphones or speakers for clear audio</li>
+                                <li>Complete the experiment in one session without refreshing</li>
+                                <li>Your responses will be automatically saved</li>
+                            </ul>
+
+                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
+                            <p style={{ fontSize: '14px', color: '#666', marginBottom: '0.75rem' }}>
+                                This ID is provided by Prolific and is required to receive payment.
+                            </p>
+                            <input
+                                type="text"
+                                value={pidInput}
+                                onChange={(e) => setPidInput(e.target.value)}
+                                placeholder="Prolific ID"
+                                style={{ width: '100%', padding: '10px', fontSize: '18px', marginBottom: '1.5rem', boxSizing: 'border-box' }}
+                            />
+                            <button
+                                className="button-primary"
+                                onClick={handleStart}
+                                disabled={!pidInput.trim()}
+                                style={{ width: '100%' }}
+                            >
+                                Start Experiment
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ========== 保存中 → 自动跳转问卷 ==========
+            if (stage === 'saving' && summary) {
+                const failed = uploadState.pending > 0 && uploadState.sending === 0;
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
                         <div className="card">
                             <div className="completion-screen">
-                                <h2>✅ Experiment Complete!</h2>
-                                <p style={{ fontSize: '20px', marginBottom: '2rem', color: '#666' }}>
-                                    All 50 questions finished
+                                <h2>Saving your responses...</h2>
+                                <p style={{ fontSize: '16px', color: '#666', marginTop: '0.75rem' }}>
+                                    Please keep this page open until the save is complete.
                                 </p>
-
-                                <div className="stats">
-                                    <div className="stat-item">
-                                        <div className="stat-number">{summary.correctAnswers}</div>
-                                        <div className="stat-label">Correct</div>
-                                    </div>
-                                    <div className="stat-item">
-                                        <div className="stat-number">{QUESTIONS.length - summary.correctAnswers}</div>
-                                        <div className="stat-label">Errors</div>
-                                    </div>
-                                    <div className="stat-item">
-                                        <div className="stat-number">{summary.accuracy}%</div>
-                                        <div className="stat-label">Accuracy</div>
-                                    </div>
-                                </div>
-
                                 {renderUploadStatus()}
-
-                                <button
-                                    className="button-primary"
-                                    onClick={downloadJSON}
-                                    style={{ marginTop: '0.75rem', background: '#1976d2' }}
-                                >
-                                    💾 Download Results (JSON)
-                                </button>
-
+                                {failed && (
+                                    <button
+                                        className="button-primary"
+                                        onClick={downloadJSON}
+                                        style={{ marginTop: '0.75rem', background: '#1976d2' }}
+                                    >
+                                        💾 Download backup (JSON)
+                                    </button>
+                                )}
                                 <p style={{ marginTop: '2rem', fontSize: '11px', color: '#666' }}>
                                     Participant ID: {prolificId.current}
                                 </p>
@@ -716,7 +775,12 @@
                                 ref={inputRef}
                                 type="text"
                                 value={userInput}
-                                onChange={(e) => setUserInput(e.target.value)}
+                                onChange={(e) => {
+                                    setUserInput(e.target.value);
+                                    if (qlog.current) {
+                                        qlog.current.events.push({ t: Date.now(), type: 'input', value: e.target.value });
+                                    }
+                                }}
                                 onKeyPress={handleKeyPress}
                                 className="inline-input"
                                 placeholder="type here"
