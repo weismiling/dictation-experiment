@@ -115,8 +115,18 @@
         return out;
     }
 
+    const TIME_KEYS = ['shownAt', 'nextAt', 'startedAt', 'completedAt', 'replace.t'];
+    const jst = ms => new Date(ms).toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' });
+
     function toCSV(list) {
-        const flat = list.map(r => flatten(r));
+        const flat = list.map(r => {
+            const { _id, ...rest } = r;           // 去掉数据库内部编号
+            const f = flatten(rest);
+            TIME_KEYS.forEach(k => {               // 时间戳额外生成东京时间列
+                if (typeof f[k] === 'number') f[k + '_JST'] = jst(f[k]);
+            });
+            return f;
+        });
         const cols = [...new Set(flat.flatMap(r => Object.keys(r)))];
         const esc = v => {
             if (v === null || v === undefined) return '';
