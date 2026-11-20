@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dictation Practice - Control Group (50 Questions)</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            line-height: 1.6;
+            font-size: 18px;
+        }
+
+        #root {
+            min-height: 100vh;
+            padding: 80px 20px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #f5f5f5;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+        }
+
+        .question-number {
+            font-size: 14px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .button-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .button-primary:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .sentence {
+            font-size: 22px;
+            line-height: 1.8;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .inline-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #999;
+            min-width: 150px;
+            text-align: center;
+            padding: 0.5rem 0;
+            margin: 0 0.5rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 22px;
+            font-family: inherit;
+        }
+
+        .inline-input:focus {
+            outline: none;
+            border-bottom-color: #1976d2;
+            background: rgba(25, 118, 210, 0.05);
+        }
+
+        .feedback-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 3px solid #d32f2f;
+            background: #f5f5f5;
+        }
+
+        .segment {
+            display: inline;
+            margin: 0 2px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .segment-error {
+            color: #c62828;
+            text-decoration: underline wavy #d32f2f;
+            font-weight: 500;
+        }
+
+        .segment-error:hover {
+            background: rgba(211, 47, 47, 0.1);
+        }
+
+        .segment-suggestion {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .status-success {
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(76, 175, 80, 0.1);
+            color: #2e7d32;
+            text-align: center;
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+
+        .completion-screen {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .completion-screen h2 {
+            font-size: 28px;
+            color: #2e7d32;
+            margin-bottom: 1rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        .upload-status {
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+
+        .upload-success {
+            background: rgba(76, 175, 80, 0.1);
+            color: #2e7d32;
+        }
+
+        .upload-error {
+            background: rgba(211, 47, 47, 0.1);
+            color: #c62828;
+        }
+
+        .upload-uploading {
+            background: rgba(25, 118, 210, 0.1);
+            color: #1976d2;
+        }
+
+        .audio-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .banner {
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid #2196f3;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: #1565c0;
+            font-weight: 500;
+        }
+        .replace-btn { display: block; margin: 16px 0 0 auto; }
+        .diff-label { font-size: 14px; color: #666; font-weight: 600; margin: 12px 0 6px; }
+        .diff-row { font-family: Monaco, Consolas, monospace; font-size: 22px; white-space: nowrap; overflow-x: auto; }
+        .diff-cell { display: inline-block; min-width: 14px; text-align: center; }
+        .diff-sep { color: #bbb; margin: 0 4px; }
+        .diff-bad { color: #d32f2f; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyABPS87c_8CnEfsMiuWfWmSFl0wrOIwBuo",
+            authDomain: "dictation-experiment.firebaseapp.com",
+            projectId: "dictation-experiment",
+            storageBucket: "dictation-experiment.firebasestorage.app",
+            messagingSenderId: "133046248660",
+            appId: "1:133046248660:web:7af799b88fed0b4f0f0741"
+        };
+
+        let db = null;
+
+        // 初始化Firebase
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            console.log('✓ Firebase initialized');
+        } catch (error) {
+            console.error('Firebase error:', error);
+        }
+
+        const QUESTIONS_BASE = [
+            { word: 'concede', sentence: 'The government has ________ that the new tax policy has been a disaster.', accept: ['concede', 'conceded'] },
+            { word: 'honorary', sentence: 'He\'s got a lot of ________ degrees and awards from educational establishments worldwide.' },
+            { word: 'accumulate', sentence: 'As people ________ more wealth, they tend to spend a greater proportion of their incomes.' },
+            { word: 'noticeable', sentence: 'Plant growth is most ________ in spring and early summer.' },
+            { word: 'orchestra', sentence: 'The ________ is to perform its last ever concert tomorrow night at the Albert Hall.' },
+            { word: 'ignorance', sentence: 'Public ________ about the disease is still a cause for concern.' },
+            { word: 'theoretical', sentence: 'The president does not want to answer any ________ questions.' },
+            { word: 'relevant', sentence: 'Education should be ________ to the child\'s needs.' },
+            { word: 'cemetery', sentence: 'His father is buried in the ________ on the hill.' },
+            { word: 'contemporary', sentence: 'Although the play was written hundreds of years ago, it still has a ________ feel to it.' },
+            { word: 'intelligence', sentence: 'He is blessed with both good looks and ________.' },
+            { word: 'propaganda', sentence: 'He was brought up on a diet of political ________ from birth.' },
+            { word: 'sufficient', sentence: 'This recipe should be ________ for five people.' },
+            { word: 'guidance', sentence: 'Young people don\'t always appreciate the ________ offered by their parents and teachers.' },
+            { word: 'consequence', sentence: 'Not making a will can have serious ________ for your children and other family members.', accept: ['consequence', 'consequences'] },
+            { word: 'principle', sentence: 'The country is run on socialist ________.', accept: ['principle', 'principles'] },
+            { word: 'appreciate', sentence: 'Any help you could give me would be greatly ________.', accept: ['appreciate', 'appreciated'] },
+            { word: 'revolutionary', sentence: 'He was arrested for taking part in ________ activities.' },
+            { word: 'extrovert', sentence: 'I think it helps if you have an ________ personality.' },
+            { word: 'feasible', sentence: 'With the extra resources, the project now seems ________.' },
+            { word: 'bizarre', sentence: 'That party was too ________ for me!' },
+            { word: 'committee', sentence: 'The finance ________ controls the school\'s budget.' },
+            { word: 'convenience', sentence: 'I like the ________ of living close to work.' },
+            { word: 'compatible', sentence: 'It was when we started living together that we found we just weren\'t ________.' },
+            { word: 'extraordinary', sentence: 'He told the ________ story of his escape.' },
+            { word: 'humorous', sentence: 'He told one or two ________ stories about his years as a policeman.' },
+            { word: 'immediately', sentence: 'We really ought to leave ________.' },
+            { word: 'independent', sentence: 'An ________ inquiry will determine whether the case should move forward.' },
+            { word: 'pursue', sentence: 'He decided to ________ a career in television.' },
+            { word: 'competent', sentence: 'She has shown herself to be a highly ________ manager.' },
+            { word: 'consciousness', sentence: 'The children have no ________ of being different.' },
+            { word: 'calendar', sentence: 'An old ________ for 2012 was still hanging on the wall of her office.' },
+            { word: 'consensus', sentence: 'The general ________ in the office is that he can\'t do his job.' },
+            { word: 'disappear', sentence: 'The sun ________ behind heavy clouds.', accept: ['disappear', 'disappeared'] },
+            { word: 'disappoint', sentence: 'I\'m sorry to ________ you, but I\'m afraid I can\'t come after all.' },
+            { word: 'disastrous', sentence: 'Such a war would be ________ for the country.' },
+            { word: 'hierarchy', sentence: 'Some monkeys have a very complex social ________.' },
+            { word: 'occasion', sentence: 'We met on several ________ to discuss the issue.', accept: ['occasion', 'occasions'] },
+            { word: 'privilege', sentence: 'I had the ________ of interviewing Picasso in the 1960s.' },
+            { word: 'refrigerator', sentence: 'Store fruit juice in the ________.' },
+            { word: 'embarrass', sentence: 'I didn\'t want to ________ her in front of her friends.' },
+            { word: 'separate', sentence: 'The art department and the music department are in two ________ buildings.' },
+            { word: 'apologize', sentence: 'She ________ for her husband’s rudeness.', accept: ['apologize', 'apologized'] },
+            { word: 'foreseeable', sentence: 'I\'ll be living here for the ________ future.' },
+            { word: 'irresistible', sentence: 'She gave me one of those ________ smiles and I just had to agree.' },
+            { word: 'millennium', sentence: 'Imagine what the world will be like at the end of the next ________.' },
+            { word: 'pronunciation', sentence: 'There are two different ________ of this word.', accept: ['pronunciation', 'pronunciations'] },
+            { word: 'questionnaire', sentence: 'Visitors to the country have been asked to fill out a detailed ________.' },
+            { word: 'definitely', sentence: 'He ________ said he\'d be here.' },
+            { word: 'occurrence', sentence: 'Death was an everyday ________ during the Civil War.' }
+        ];
+        // 两周后测试使用固定的替代顺序（同一批单词、音频和句子，只改变出现顺序，与即时后测顺序不同）
+        const DELAYED_ORDER = [26, 14, 24, 44, 43, 30, 1, 20, 9, 29, 16, 18, 31, 12, 8, 47, 41, 40, 6, 27, 34, 42, 35, 49, 15, 2, 13, 7, 3, 28, 19, 32, 37, 25, 45, 36, 39, 46, 23, 10, 48, 0, 4, 21, 5, 38, 22, 17, 11, 33];
+        const QUESTIONS = DELAYED_ORDER.map(i => QUESTIONS_BASE[i]);
+
+        // 只接受指定的形式：8 个空格允许过去式/原型或单数/复数，其余只接受原词
+        function getAllWordForms(word) {
+            const q = QUESTIONS.find(x => x.word === word);
+            return q && q.accept ? q.accept : [word];
+        }
+
+        // 字符级对齐比较（LCS 对齐，缺字母留空，之后的字母重新对齐）
+        function compareWordsCharByChar(correctWord, inputWord) {
+            const c = correctWord.toLowerCase();
+            const t = inputWord.toLowerCase();
+            const n = c.length, m = t.length;
+            // dp[i][j] = c[i..] 与 t[j..] 的最长公共子序列长度
+            const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+            for (let i = n - 1; i >= 0; i--) {
+                for (let j = m - 1; j >= 0; j--) {
+                    dp[i][j] = c[i] === t[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+                }
+            }
+            const result = [];
+            let i = 0, j = 0;
+            while (i < n || j < m) {
+                if (i < n && j < m && c[i] === t[j]) {
+                    result.push({ correct: correctWord[i], input: inputWord[j], match: true });
+                    i++; j++;
+                } else if (i < n && (j >= m || dp[i + 1][j] >= dp[i][j + 1])) {
+                    // 正确拼写中的字母在输入中缺失
+                    result.push({ correct: correctWord[i], input: ' ', match: false, missing: true });
+                    i++;
+                } else {
+                    // 输入中多出的字母
+                    result.push({ correct: '', input: inputWord[j], match: false, extra: true });
+                    j++;
+                }
+            }
+            // 相邻的"缺字母 + 多字母"合并为一个替换位置（如 e→a）
+            const merged = [];
+            for (let k = 0; k < result.length; k++) {
+                const cur = result[k], nxt = result[k + 1];
+                if (cur.missing && nxt && nxt.extra) {
+                    merged.push({ correct: cur.correct, input: nxt.input, match: false });
+                    k++;
+                } else if (cur.extra && nxt && nxt.missing) {
+                    merged.push({ correct: nxt.correct, input: cur.input, match: false });
+                    k++;
+                } else {
+                    merged.push(cur);
+                }
+            }
+            return merged;
+        }
+
+        // 点击某一列后，用该列的正确字母替换，其余列保持不变
+        function buildInputFromColumns(columns, clickedIdx) {
+            let s = '';
+            columns.forEach((col, k) => {
+                if (k === clickedIdx) s += col.correct;
+                else if (!col.missing) s += col.input;
+            });
+            return s;
+        }
+
+        // 实验结束后的问卷（题目和选项可直接修改）
+        // type: 'single' 单选，'text' 文本；optional: true 为可选题
+        const QUESTIONNAIRE = [
+            { id: 'age', type: 'single', text: 'What is your age group?',
+              options: ['18-24', '25-34', '35-44', '45-54', '55 or older', 'Prefer not to say'] },
+            { id: 'gender', type: 'single', text: 'What is your gender?',
+              options: ['Female', 'Male', 'Non-binary / other', 'Prefer not to say'] },
+            { id: 'native_language', type: 'text', text: 'What is your first (native) language?' },
+            { id: 'english_level', type: 'single', text: 'How would you rate your English proficiency?',
+              options: ['Beginner', 'Elementary', 'Intermediate', 'Upper-intermediate', 'Advanced', 'Native-like'] },
+            { id: 'english_years', type: 'single', text: 'For how many years have you studied English?',
+              options: ['Less than 3 years', '3-6 years', '7-10 years', 'More than 10 years'] },
+            { id: 'english_use', type: 'single', text: 'How often do you read or write in English?',
+              options: ['Rarely', 'About once a week', 'Several times a week', 'Every day'] },
+            { id: 'audio_device', type: 'single', text: 'What did you use to listen to the audio?',
+              options: ['Headphones or earphones', 'External speakers', 'Laptop or device built-in speakers', 'Other'] },
+            { id: 'noise', type: 'single', text: 'How noisy was your environment during the experiment?',
+              options: ['Very quiet', 'Somewhat quiet', 'Some background noise', 'Noisy'] },
+            { id: 'tool_use', type: 'single', text: 'During the task, did you use any other tool (dictionary, translator, spellchecker, AI tool)?',
+              options: ['Never', 'Once or twice', 'Several times', 'Frequently'] },
+            { id: 'difficulty', type: 'single', text: 'How difficult was the task overall?',
+              options: ['1 - Very easy', '2', '3', '4', '5 - Very difficult'] },
+            { id: 'confidence', type: 'single', text: 'How confident were you in your spelling overall?',
+              options: ['1 - Not confident at all', '2', '3', '4', '5 - Very confident'] },
+            { id: 'replace_helpful', type: 'single', text: 'How helpful was the "Replace with correct spelling" button?',
+              options: ['Not helpful', 'Somewhat helpful', 'Very helpful', 'I did not use it'] },
+            { id: 'technical', type: 'single', text: 'Did you experience any technical problems?',
+              options: ['No problems', 'Audio did not play', 'The page was slow or froze', 'Other'] },
+            { id: 'attention', type: 'single', text: 'To show you are paying attention, please select "Somewhat agree".',
+              options: ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Somewhat agree', 'Strongly agree'] },
+            { id: 'comments', type: 'text', optional: true, text: 'Any comments about the experiment?' },
+        ];
+
+        // 问卷完成后跳转到 Prolific 完成页面（把 XXXXXXXX 替换为你的完成码）
+        const PROLIFIC_COMPLETION_URL = 'https://app.prolific.com/submissions/complete?cc=XXXXXXXX';
+
+        function DictationOnline() {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [userInput, setUserInput] = useState('');
+            const [feedback, setFeedback] = useState(null);
+            const [stats, setStats] = useState({ correct: 0, total: 0 });
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [stage, setStage] = useState('intro'); // intro -> task -> saving
+            const [summary, setSummary] = useState(null);
+            const [answers, setAnswers] = useState({});
+            const [uploadState, setUploadState] = useState({ pending: 0, sending: 0 });
+            const inputRef = useRef(null);
+
+            // 参与者信息（来自Prolific URL参数）
+            const prolificId = useRef((() => {
+                const params = new URLSearchParams(window.location.search);
+                return params.get('PROLIFIC_PID') || params.get('pid') || '';
+            })());
+            const [pidInput, setPidInput] = useState(prolificId.current);
+            const studyInfo = useRef((() => {
+                const params = new URLSearchParams(window.location.search);
+                return { studyId: params.get('STUDY_ID') || null, sessionId: params.get('SESSION_ID') || null };
+            })());
+            const startedAt = useRef(Date.now());
+
+            // 日志：qlog = 当前题的过程记录；records = 已完成题的记录；uploadQueue = 待上传队列
+            const qlog = useRef(null);
+            const records = useRef([]);
+            const postRecords = useRef([]);
+            const postAnswers = useRef([]);
+            const pendingReturn = useRef(null);
+            const postStartedAt = useRef(0);
+            const uploadQueue = useRef([]);
+
+            const currentQuestion = QUESTIONS[currentIndex];
+            const progress = ((currentIndex + 1) / QUESTIONS.length) * 100;
+
+            useEffect(() => {
+                if (stage !== 'task' && stage !== 'posttest') return;
+                qlog.current = {
+                    qNumber: currentIndex + 1,
+                    targetWord: QUESTIONS[currentIndex].word,
+                    shownAt: Date.now(),
+                    submissions: [],
+                    replace: null,
+                    events: pendingReturn.current ? [pendingReturn.current] : [],
+                };
+                pendingReturn.current = null;
+
+                if (inputRef.current) {
+                    setTimeout(() => inputRef.current && inputRef.current.focus(), 100);
+                }
+
+                const timer = setTimeout(() => {
+                    handlePlayAudio();
+                }, 2000);
+
+                return () => clearTimeout(timer);
+            }, [currentIndex, stage]);
+
+            const handleStart = () => {
+                const id = pidInput.trim();
+                if (!id) return;
+                prolificId.current = id;
+                startedAt.current = Date.now();
+                postStartedAt.current = Date.now();
+                startedAt.current = Date.now();
+                setStage('posttest');
+            };
+
+            // 上传全部成功后自动跳转问卷（未成功前不跳转，避免数据丢失）
+            useEffect(() => {
+                if (stage === 'saving' && summary && uploadState.pending === 0) {
+                    const timer = setTimeout(() => {
+                        window.location.href = PROLIFIC_COMPLETION_URL;
+                    }, 1500);
+                    return () => clearTimeout(timer);
+                }
+            }, [stage, summary, uploadState.pending]);
+
+            const handleSubmitQuestionnaire = () => {
+                enqueueUpload({
+                    type: 'questionnaire',
+                    group: 'delayed',
+                    prolificId: prolificId.current,
+                    studyId: studyInfo.current.studyId,
+                    sessionId: studyInfo.current.sessionId,
+                    completedAt: Date.now(),
+                    answers: answers,
+                });
+                setStage('saving');
+            };
+
+            // ---------- 上传（每题一条 + 完成后一条汇总；失败保留在队列中重试）----------
+            const refreshUploadState = () => {
+                setUploadState({
+                    pending: uploadQueue.current.length,
+                    sending: uploadQueue.current.filter(item => item.sending).length,
+                });
+            };
+
+            const flushUploadQueue = () => {
+                if (db) {
+                    uploadQueue.current.forEach(item => {
+                        if (item.sending) return;
+                        item.sending = true;
+                        const timeout = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('timeout')), 15000));
+                        Promise.race([db.collection('experiments').add(item.data), timeout])
+                            .then(() => {
+                                uploadQueue.current = uploadQueue.current.filter(x => x !== item);
+                            })
+                            .catch(err => {
+                                item.sending = false;
+                                console.error('Upload failed, will retry:', err);
+                            })
+                            .finally(refreshUploadState);
+                    });
+                }
+                refreshUploadState();
+            };
+
+            const enqueueUpload = (data) => {
+                uploadQueue.current.push({ data: data, sending: false });
+                flushUploadQueue();
+            };
+
+            useEffect(() => {
+                window.addEventListener('online', flushUploadQueue);
+                return () => window.removeEventListener('online', flushUploadQueue);
+            }, []);
+
+            // ---------- 构建单题记录 ----------
+            const diffMs = (from, to) => (from !== null && to !== null ? to - from : null);
+
+            const buildQuestionRecord = (log, nextAt) => {
+                const subs = log.submissions;
+                const firstSub = subs[0];
+                const firstSubmitAt = firstSub.t;
+                const replaceAt = log.replace ? log.replace.t : null;
+                const correctAtNext = !!log.replace || subs[subs.length - 1].correct;
+
+                return {
+                    type: 'question',
+                    group: 'delayed',
+                    prolificId: prolificId.current,
+                    studyId: studyInfo.current.studyId,
+                    sessionId: studyInfo.current.sessionId,
+                    qNumber: log.qNumber,
+                    targetWord: log.targetWord,
+                    shownAt: log.shownAt,
+                    nextAt: nextAt,
+                    submissionCount: subs.length,
+                    firstSubmitCorrect: firstSub.correct,
+                    correctAtNext: correctAtNext,
+                    replaceClicked: !!log.replace,
+                    replace: log.replace,
+                    submissions: subs,
+                    events: log.events,
+                    timing: {
+                        firstSubmitLatencyMs: diffMs(log.shownAt, firstSubmitAt),
+                        firstSubmitToNextMs: diffMs(firstSubmitAt, nextAt),
+                        replaceToNextMs: diffMs(replaceAt, nextAt),
+                        retryIntervalsMs: subs.slice(1).map((s, i) => s.t - subs[i].t),
+                    },
+                };
+            };
+
+            // 即时后测 / 延迟测试：没有反馈；可以返回上一题修改；每次离开一题（Enter 或返回）都上传一次记录
+            const saveVisit = (leaveAction) => {
+                const log = qlog.current;
+                if (!log) return;
+                const leftAt = Date.now();
+                if (leaveAction === 'back') {
+                    log.events.push({ t: leftAt, type: 'back', before: userInput });
+                } else {
+                    log.events.push({ t: leftAt, type: 'next', finalAnswer: userInput });
+                }
+                const prev = postAnswers.current[currentIndex] || { visits: 0, submissionCount: 0, firstCorrect: null, finalInput: '', finalCorrect: false };
+                prev.visits += 1;
+                prev.submissionCount += log.submissions.length;
+                if (log.submissions.length) {
+                    if (prev.firstCorrect === null) prev.firstCorrect = log.submissions[0].correct;
+                    const last = log.submissions[log.submissions.length - 1];
+                    prev.finalInput = last.input;
+                    prev.finalCorrect = last.correct;
+                }
+                postAnswers.current[currentIndex] = prev;
+                enqueueUpload({
+                    type: 'delayed',
+                    group: 'delayed',
+                    prolificId: prolificId.current,
+                    studyId: studyInfo.current.studyId,
+                    sessionId: studyInfo.current.sessionId,
+                    qNumber: log.qNumber,
+                    targetWord: log.targetWord,
+                    visit: prev.visits,
+                    leaveAction: leaveAction,
+                    submissions: log.submissions,
+                    events: log.events,
+                });
+                qlog.current = null;
+            };
+
+            const goBackPosttest = () => {
+                if (stage !== 'posttest' || currentIndex === 0) return;
+                saveVisit('back');
+                const target = currentIndex - 1;
+                const prevAnswer = postAnswers.current[target];
+                pendingReturn.current = { t: Date.now(), type: 'return', restored: prevAnswer ? prevAnswer.finalInput : '' };
+                setCurrentIndex(target);
+                setUserInput(prevAnswer ? prevAnswer.finalInput : '');
+                setFeedback(null);
+            };
+
+            const advancePosttest = () => {
+                const nextAt = Date.now();
+                saveVisit('next');
+                if (currentIndex === QUESTIONS.length - 1) {
+                    const answers = postAnswers.current.filter(Boolean);
+                    const correctCount = answers.filter(a => a.finalCorrect).length;
+                    const finalPost = {
+                        type: 'delayed_summary',
+                        group: 'delayed',
+                        prolificId: prolificId.current,
+                        studyId: studyInfo.current.studyId,
+                        sessionId: studyInfo.current.sessionId,
+                        startedAt: postStartedAt.current,
+                        completedAt: nextAt,
+                        totalDurationMs: nextAt - postStartedAt.current,
+                        totalQuestions: QUESTIONS.length,
+                        correctAnswers: correctCount,
+                        firstTryCorrect: answers.filter(a => a.firstCorrect === true).length,
+                        revisedCount: answers.filter(a => a.submissionCount > 1).length,
+                        accuracy: Math.round((correctCount / QUESTIONS.length) * 100),
+                        userAgent: navigator.userAgent,
+                    };
+                    enqueueUpload(finalPost);
+                    setSummary(finalPost);
+                    setStage('saving');
+                } else {
+                    const nextIdx = currentIndex + 1;
+                    const nextAnswer = postAnswers.current[nextIdx];
+                    setCurrentIndex(nextIdx);
+                    setUserInput(nextAnswer ? nextAnswer.finalInput : '');
+                }
+            };
+
+            // ---------- 交互 ----------
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter') {
+                    if (feedback && feedback.type === 'correct') {
+                        handleNext();
+                    } else if (userInput.trim()) {
+                        handleSubmit();
+                    }
+                }
+            };
+
+            const handleSubmit = () => {
+                if (userInput.trim() === '') return;
+
+                const now = Date.now();
+                const acceptableForms = getAllWordForms(currentQuestion.word);
+                const isCorrect = acceptableForms.some(form => form.toLowerCase() === userInput.toLowerCase());
+
+                if (qlog.current) {
+                    qlog.current.submissions.push({ t: now, input: userInput, correct: isCorrect });
+                    qlog.current.events.push({
+                        t: now, type: 'enter', before: userInput, after: userInput, correct: isCorrect,
+                    });
+                }
+
+                if (stage === 'posttest') {
+                    advancePosttest();
+                    return;
+                }
+
+                if (isCorrect) {
+                    setFeedback({ type: 'correct' });
+                    setStats(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
+                } else {
+                    const comparison = compareWordsCharByChar(currentQuestion.word, userInput);
+                    setFeedback({ type: 'spelling_error', comparison: comparison });
+                    setStats(prev => ({ ...prev, total: prev.total + 1 }));
+                }
+            };
+
+            // 一键替换：点击后输入框替换为正确拼写，并按正确处理（计为正确）
+            const handleReplaceWithCorrect = () => {
+                if (qlog.current) {
+                    const now = Date.now();
+                    qlog.current.replace = { t: now, typedBefore: userInput, after: currentQuestion.word };
+                    qlog.current.events.push({ t: now, type: 'replace', before: userInput, after: currentQuestion.word });
+                }
+                setUserInput(currentQuestion.word);
+                setFeedback({ type: 'correct', replaced: true });
+                setStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+                // 替换后把焦点还给输入框，否则按 Enter 无法进入下一题
+                setTimeout(() => inputRef.current && inputRef.current.focus(), 0);
+            };
+
+            const handleNext = () => {
+                if (!feedback || feedback.type !== 'correct' || !qlog.current) return;
+
+                const nextAt = Date.now();
+                qlog.current.events.push({ t: nextAt, type: 'next', finalAnswer: userInput });
+                const record = buildQuestionRecord(qlog.current, nextAt);
+                qlog.current = null;
+                records.current.push(record);
+                enqueueUpload(record);
+
+                if (currentIndex === QUESTIONS.length - 1) {
+                    const correctCount = records.current.filter(r => r.correctAtNext).length;
+                    const finalSummary = {
+                        group: 'delayed',
+                        prolificId: prolificId.current,
+                        studyId: studyInfo.current.studyId,
+                        sessionId: studyInfo.current.sessionId,
+                        startedAt: startedAt.current,
+                        completedAt: nextAt,
+                        totalDurationMs: nextAt - startedAt.current,
+                        totalQuestions: QUESTIONS.length,
+                        correctAnswers: correctCount,
+                        firstTryCorrect: records.current.filter(r => r.firstSubmitCorrect).length,
+                        replaceCount: records.current.filter(r => r.replaceClicked).length,
+                        accuracy: Math.round((correctCount / QUESTIONS.length) * 100),
+                        userAgent: navigator.userAgent,
+                    };
+                    enqueueUpload({ type: 'summary', ...finalSummary });
+                    setSummary(finalSummary);
+                    postStartedAt.current = Date.now();
+                    setCurrentIndex(0);
+                    setUserInput('');
+                    setFeedback(null);
+                    setStage('posttest');
+                } else {
+                    setCurrentIndex(currentIndex + 1);
+                    setUserInput('');
+                    setFeedback(null);
+                }
+            };
+
+            const handlePlayAudio = () => {
+                if (qlog.current) {
+                    qlog.current.events.push({ t: Date.now(), type: 'audio' });
+                }
+                setIsPlaying(true);
+                const audioUrl = `https://raw.githubusercontent.com/weismiling/audio-listening-experiment/main/audio/${currentQuestion.word}.mp3`;
+                const audio = new Audio(audioUrl);
+                audio.playbackRate = 0.9;
+                audio.onended = () => setIsPlaying(false);
+                audio.onerror = () => setIsPlaying(false);
+                const playPromise = audio.play();
+                if (playPromise && playPromise.catch) {
+                    // 浏览器阻止了自动播放（第一题尚未有用户点击）：恢复按钮，让参与者手动点击播放
+                    playPromise.catch(() => setIsPlaying(false));
+                }
+            };
+
+            const downloadJSON = () => {
+                const data = { summary: summary, questions: records.current };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `result_${prolificId.current}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            // ========== 完成页面 ==========
+            const renderUploadStatus = () => {
+                if (uploadState.pending === 0) {
+                    return (
+                        <div className="upload-status upload-success">
+                            ✓ Saved. Redirecting to Prolific...
+                        </div>
+                    );
+                }
+                const sending = uploadState.sending > 0;
+                return (
+                    <div className={`upload-status ${sending ? 'upload-uploading' : 'upload-error'}`}>
+                        {sending
+                            ? 'Uploading results... please keep this page open.'
+                            : `${uploadState.pending} record(s) not uploaded yet. Please check your connection and retry.`}
+                        <div style={{ marginTop: '0.75rem' }}>
+                            <button className="button-primary" onClick={flushUploadQueue} style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '14px' }}>
+                                🔁 Retry upload
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            // ========== 说明页 + Prolific ID 输入 ==========
+            if (stage === 'intro') {
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <h2 style={{ marginBottom: '1.25rem' }}>Follow-up Spelling Test</h2>
+
+                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>📋 Experiment Instructions:</h3>
+                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
+                                <li>Duration: About 5-10 minutes</li>
+                                <li>Task: Listen to 50 audio clips and fill in the missing word</li>
+                                <li>Each audio plays automatically and can be replayed as many times as needed</li>
+                                <li>There is no feedback. You may go back to the previous question with the Back button to correct an answer; pressing Enter saves each answer and moves on</li>
+                                <li>Use headphones or speakers for clear audio</li>
+                            </ul>
+
+                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>⚠️ Important Notes:</h3>
+                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
+                                <li>Please ensure you have a stable internet connection</li>
+                                <li>Complete the test in one session without refreshing</li>
+                                <li>Your responses will be automatically saved</li>
+                            </ul>
+
+                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
+                            <p style={{ fontSize: '14px', color: '#666', marginBottom: '0.75rem' }}>
+                                This ID is provided by Prolific and is required to receive payment.
+                            </p>
+                            <input
+                                type="text"
+                                value={pidInput}
+                                onChange={(e) => setPidInput(e.target.value)}
+                                placeholder="Prolific ID"
+                                style={{ width: '100%', padding: '10px', fontSize: '18px', marginBottom: '1.5rem', boxSizing: 'border-box' }}
+                            />
+                            <button
+                                className="button-primary"
+                                onClick={handleStart}
+                                disabled={!pidInput.trim()}
+                                style={{ width: '100%' }}
+                            >
+                                Start Experiment
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ========== 实验后问卷 ==========
+            if (stage === 'questionnaire') {
+                const allAnswered = QUESTIONNAIRE.every(q => q.optional || (answers[q.id] && answers[q.id] !== ''));
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <h2 style={{ marginBottom: '0.5rem' }}>Final Questionnaire</h2>
+                            <p style={{ fontSize: '15px', color: '#666', marginBottom: '1.5rem' }}>
+                                Please answer the following questions. Questions marked "optional" can be left blank.
+                            </p>
+                            {QUESTIONNAIRE.map((q, idx) => (
+                                <div key={q.id} style={{ marginBottom: '1.5rem' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                                        {idx + 1}. {q.text}{q.optional ? ' (optional)' : ''}
+                                    </div>
+                                    {q.type === 'text' ? (
+                                        <textarea
+                                            value={answers[q.id] || ''}
+                                            onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                            style={{ width: '100%', minHeight: '80px', padding: '8px', fontSize: '16px', boxSizing: 'border-box' }}
+                                        />
+                                    ) : (
+                                        q.options.map(opt => (
+                                            <label key={opt} style={{ display: 'block', padding: '5px 0', cursor: 'pointer', fontSize: '16px' }}>
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value={opt}
+                                                    checked={answers[q.id] === opt}
+                                                    onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                                                    style={{ marginRight: '8px' }}
+                                                />
+                                                {opt}
+                                            </label>
+                                        ))
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                className="button-primary"
+                                onClick={handleSubmitQuestionnaire}
+                                disabled={!allAnswered}
+                                style={{ width: '100%', marginTop: '1rem' }}
+                            >
+                                Submit and continue
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ========== 保存中 → 自动跳转 Prolific ==========
+            if (stage === 'saving' && summary) {
+                const failed = uploadState.pending > 0 && uploadState.sending === 0;
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <div className="completion-screen">
+                                <h2>Saving your responses...</h2>
+                                <p style={{ fontSize: '16px', color: '#666', marginTop: '0.75rem' }}>
+                                    Please keep this page open until the save is complete.
+                                </p>
+                                {renderUploadStatus()}
+                                {failed && (
+                                    <button
+                                        className="button-primary"
+                                        onClick={downloadJSON}
+                                        style={{ marginTop: '0.75rem', background: '#1976d2' }}
+                                    >
+                                        💾 Download backup (JSON)
+                                    </button>
+                                )}
+                                <p style={{ marginTop: '2rem', fontSize: '11px', color: '#666' }}>
+                                    Participant ID: {prolificId.current}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 答题页面
+            return (
+                <div className="container">
+                    {stage === 'posttest' ? <div className="banner">📝 FOLLOW-UP TEST - 50 Questions (no feedback)</div> : <div className="banner">🌐 Follow-up Spelling Test - 50 Questions</div>}
+
+                    <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                    </div>
+
+                    <div className="card">
+                        <div className="question-number">{stage === 'posttest' ? 'Post-test · ' : ''}Question {currentIndex + 1} of {QUESTIONS.length}</div>
+
+                        <div className="audio-controls">
+                            <button 
+                                className="button-primary" 
+                                onClick={handlePlayAudio}
+                                disabled={isPlaying}
+                            >
+                                {isPlaying ? '🔊 Playing...' : '🔊 Play Audio'}
+                            </button>
+                        </div>
+
+                        <div className="sentence">
+                            {currentQuestion.sentence.split('________')[0]}
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={userInput}
+                                onChange={(e) => {
+                                    setUserInput(e.target.value);
+                                    if (qlog.current) {
+                                        qlog.current.events.push({ t: Date.now(), type: 'input', value: e.target.value });
+                                    }
+                                }}
+                                onKeyPress={handleKeyPress}
+                                className="inline-input"
+                                placeholder="type here"
+                            />
+                            {currentQuestion.sentence.split('________')[1]}
+                        </div>
+
+                        {feedback && feedback.type === 'correct' && !feedback.replaced && (
+                            <div className="status-success">✓ Correct!</div>
+                        )}
+
+                        {feedback && feedback.type === 'spelling_error' && (
+                            <div className="feedback-section">
+                                <div className="diff-label">Your spelling:</div>
+                                <div className="diff-row">{userInput}</div>
+                                <div className="diff-label">Correct spelling:</div>
+                                <div className="diff-row">{currentQuestion.word}</div>
+                                <button
+                                    className="button-primary replace-btn"
+                                    onClick={handleReplaceWithCorrect}
+                                    style={{ background: '#1976d2' }}>
+                                    🔁 Replace with correct spelling
+                                </button>
+                            </div>
+                        )}
+
+                        {feedback && (
+                            <button 
+                                className="button-primary" 
+                                onClick={handleNext}
+                                style={{ marginTop: '2rem', width: '100%' }}
+                            >
+                                {currentIndex === QUESTIONS.length - 1 ? 'Finish Experiment →' : 'Next Question →'}
+                            </button>
+                        )}
+                        {stage === 'posttest' && currentIndex > 0 && (
+                            <button
+                                className="button-primary"
+                                onClick={goBackPosttest}
+                                style={{ marginTop: '1rem', width: '100%', background: '#777' }}
+                            >
+                                ← Back to previous question
+                            </button>
+                        )}
+                    </div>
+
+                    <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: '1rem' }}>
+                        {stage === 'task' ? `${stats.correct} / ${Math.max(stats.total, 1)} correct` : ''}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<DictationOnline />, document.getElementById('root'));
+    </script>
+</body>
+</html>
