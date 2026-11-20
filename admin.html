@@ -7,6 +7,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 680px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; }
     h2 { margin-bottom: 1rem; }
@@ -33,14 +34,13 @@
     <button id="logoutBtn">退出登录</button>
 
     <div class="desc">
-        <b>① 逐次作答表</b>：每一行是一次操作（Enter1、Enter2、Replace、Next），含操作前后的答案和两次操作之间的修改过程。<br>
-        <b>② 题目表</b>：每一行是一道题的汇总。<br>
-        <b>③ 参与者表</b>：每一行是一个人的汇总，包含问卷答案和完成状态。<br>
+        <b>Excel（一个文件，三个 Sheet）</b><br>
+        <b>1_逐次作答</b>：每一行是一次操作（Enter1、Enter2、Replace、Next），含操作前后的答案和两次操作之间的修改过程。主测试、即时后测、延迟测试都包含，用「阶段」列区分。<br>
+        <b>2_题目</b>：每一行是一道题的汇总。主测试含每题时间；即时后测和延迟测试把同一题的所有访问合并，显示访问次数、是否修改过（不含单题时间）。<br>
+        <b>3_参与者</b>：每一行是一个人的汇总，包含三个阶段的完成情况、正确数和问卷答案。<br>
         <b>JSON</b>：原始数据，用于备份。
     </div>
-    <button id="attemptsBtn" disabled>下载 ① 逐次作答表</button>
-    <button id="questionsBtn" disabled>下载 ② 题目表</button>
-    <button id="participantsBtn" disabled>下载 ③ 参与者表</button>
+    <button id="excelBtn" disabled>下载 Excel（三个 Sheet）</button>
     <button id="jsonBtn" disabled>下载 JSON（原始）</button>
 </div>
 
@@ -59,6 +59,7 @@
     const db = firebase.firestore();
 
     let rows = [];
+    let groupMap = new Map();   // prolificId -> 组别（来自 assignments；延迟测试的记录本身不含组别）
     const $ = id => document.getElementById(id);
     const setStatus = text => { $('status').textContent = text; };
 
@@ -81,13 +82,20 @@
     $('loadBtn').onclick = async () => {
         setStatus('读取中...');
         try {
-            const snap = await db.collection('experiments').get();
-            rows = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            const questions = rows.filter(r => r.type === 'question').length;
-            const summaries = rows.filter(r => r.type === 'summary').length;
-            const quest = rows.filter(r => r.type === 'questionnaire').length;
-            setStatus(`共 ${rows.length} 条记录（题目 ${questions}，汇总 ${summaries}，问卷 ${quest}）`);
-            ['attemptsBtn', 'questionsBtn', 'participantsBtn', 'jsonBtn'].forEach(id => $(id).disabled = false);
+            const [exp, asg] = await Promise.all([
+                db.collection('experiments').get(),
+                db.collection('assignments').get().catch(() => null)   // 读不到分配表时，延迟测试的组别显示为空
+            ]);
+            rows = exp.docs.map(d => ({ _id: d.id, ...d.data() }));
+            groupMap = new Map(asg ? asg.docs.map(d => [d.data().prolificId, d.data().group]) : []);
+            const count = t => rows.filter(r => r.type === t).length;
+            setStatus(
+                `共 ${rows.length} 条记录：` +
+                `主测试题目 ${count('question')}，主测试汇总 ${count('summary')}，问卷 ${count('questionnaire')}；` +
+                `即时后测题目 ${count('posttest')}，即时后测汇总 ${count('posttest_summary')}；` +
+                `延迟测试题目 ${count('delayed')}，延迟测试汇总 ${count('delayed_summary')}`
+            );
+            ['excelBtn', 'jsonBtn'].forEach(id => $(id).disabled = false);
         } catch (e) {
             setStatus('读取失败：' + e.message);
         }
@@ -100,16 +108,27 @@
         ? new Date(ms).toLocaleString('sv-SE', { timeZone: 'Asia/Tokyo' }) + '.' + String(ms % 1000).padStart(3, '0')
         : '');
 
-    const byTypeSorted = type => rows
-        .filter(r => r.type === type)
-        .sort((a, b) => (a.group || '').localeCompare(b.group || '') ||
+    // 阶段：主测试 → 即时后测 → 延迟测试
+    const STAGE = { question: '主测试', posttest: '即时后测', delayed: '延迟测试' };
+    const STAGE_ORDER = { question: 0, posttest: 1, delayed: 2 };
+
+    // 组别：优先用记录自带的 control/test；延迟测试记录用 assignments 表按 Prolific ID 查
+    const grp = r => (r.group === 'control' || r.group === 'test')
+        ? r.group
+        : (groupMap.get(r.prolificId) || r.group || '');
+
+    // 三个阶段的题目记录，按 阶段 → 组别 → 参与者 → 题号 排序
+    const questionRows = () => rows
+        .filter(r => r.type in STAGE)
+        .sort((a, b) => STAGE_ORDER[a.type] - STAGE_ORDER[b.type] ||
+            grp(a).localeCompare(grp(b)) ||
             (a.prolificId || '').localeCompare(b.prolificId || '') ||
             (a.qNumber || 0) - (b.qNumber || 0) || (a.completedAt || 0) - (b.completedAt || 0));
 
     // ---------- ① 逐次作答表 ----------
     function buildAttempts() {
         const out = [];
-        byTypeSorted('question').forEach(q => {
+        questionRows().forEach(q => {
             const events = (q.events || []).slice().sort((a, b) => a.t - b.t);
             let segment = [];              // 两次操作之间的输入变化
             let lastT = q.shownAt;
@@ -128,14 +147,23 @@
                 } else if (ev.type === 'next') {
                     action = 'Next';
                     after = ev.finalAnswer;
+                } else if (ev.type === 'back') {
+                    action = '返回上一题';
+                    before = ev.before;
+                } else if (ev.type === 'return') {
+                    action = '回到本题';
+                    after = ev.restored;
                 } else {
                     return;
                 }
                 out.push({
+                    '阶段': STAGE[q.type],
                     '参与者ID': q.prolificId,
-                    '组别': q.group,
+                    '组别': grp(q),
                     '题号': q.qNumber,
                     '目标词': q.targetWord,
+                    '访问次数': blank(q.visit),
+                    '离开方式': blank(q.leaveAction),
                     '操作': action,
                     '时间（东京）': fmtTime(ev.t),
                     '距题目出现（ms）': ev.t - q.shownAt,
@@ -153,24 +181,34 @@
     }
 
     // ---------- ② 题目表 ----------
-    // 每题一行；Enter1/Enter2… 横向展开；时间统计以秒为单位
+    // 主测试：每题一行（含时间）；即时后测、延迟测试：同一题的所有访问合并成一行（不含单题时间）
     function buildQuestions() {
-        const qs = byTypeSorted('question');
-        const maxEnter = Math.max(1, ...qs.map(q => (q.submissions || []).length));
+        const all = questionRows();
+        const main = all.filter(q => q.type === 'question');
+        const later = new Map();
+        all.filter(q => q.type !== 'question').forEach(v => {
+            const key = `${v.type}|${v.prolificId}|${v.qNumber}`;
+            if (!later.has(key)) later.set(key, { first: v, visits: 0, subs: [] });
+            const g = later.get(key);
+            g.visits += 1;
+            g.subs.push(...(v.submissions || []));
+        });
+        const maxEnter = Math.max(1,
+            ...main.map(q => (q.submissions || []).length),
+            ...[...later.values()].map(g => g.subs.length));
         const sec = ms => (typeof ms === 'number' ? (ms / 1000).toFixed(2) : '');
-        return qs.map(q => {
-            const subs = q.submissions || [];
-            const events = q.events || [];
-            const row = {
-                '参与者ID': q.prolificId,
-                '组别': q.group,
-                '题号': q.qNumber,
-                '目标词': q.targetWord,
-            };
+        const enterCols = (row, subs) => {
             for (let i = 0; i < maxEnter; i++) {
                 row[`Enter${i + 1} 答案`] = subs[i] ? subs[i].input : '';
                 row[`Enter${i + 1} 结果`] = subs[i] ? yn(subs[i].correct) : '';
             }
+            return row;
+        };
+        const mainRows = main.map(q => {
+            const subs = q.submissions || [];
+            const events = q.events || [];
+            const row = { '阶段': STAGE[q.type], '参与者ID': q.prolificId, '组别': grp(q), '题号': q.qNumber, '目标词': q.targetWord };
+            enterCols(row, subs);
             // 正确确定的时刻：点替换，或最后一次正确的 Enter
             const correctT = q.replace ? q.replace.t : (subs.length ? subs[subs.length - 1].t : null);
             const firstEnterT = subs.length ? subs[0].t : null;
@@ -183,6 +221,21 @@
             row['本题总时长（秒）'] = (q.nextAt && q.shownAt) ? sec(q.nextAt - q.shownAt) : '';
             return row;
         });
+        const laterRows = [...later.values()].map(g => {
+            const v = g.first;
+            const last = g.subs[g.subs.length - 1];
+            const row = {
+                '阶段': STAGE[v.type], '参与者ID': v.prolificId, '组别': grp(v), '题号': v.qNumber, '目标词': v.targetWord,
+                '访问次数': g.visits, '是否修改过': g.subs.length > 1 ? '是' : '否',
+            };
+            enterCols(row, g.subs);
+            row['最终答案'] = last ? last.input : '';
+            row['最终结果'] = last ? yn(last.correct) : '';
+            return row;
+        });
+        const list = [...mainRows, ...laterRows];
+        const cols = [...new Set(list.flatMap(r => Object.keys(r)))];
+        return list.map(r => Object.fromEntries(cols.map(c => [c, r[c] === undefined ? '' : r[c]])));
     }
 
     // ---------- ③ 参与者表 ----------
@@ -197,36 +250,67 @@
     ];
 
     function buildParticipants() {
+        // 以 Prolific ID 为主键（延迟测试的记录组别不可靠，不能用「组别|ID」分组）
         const map = new Map();
         rows.forEach(r => {
-            if (!['question', 'summary', 'questionnaire'].includes(r.type)) return;
-            const key = `${r.group}|${r.prolificId}`;
-            if (!map.has(key)) {
-                map.set(key, { group: r.group, id: r.prolificId, questions: [], summary: null, questionnaire: null });
+            if (!r.prolificId) return;
+            if (!map.has(r.prolificId)) {
+                map.set(r.prolificId, {
+                    id: r.prolificId, group: grp(r),
+                    main: [], post: [], delayed: [],
+                    mainSum: null, postSum: null, delSum: null, questionnaire: null,
+                });
             }
-            const p = map.get(key);
-            if (r.type === 'question') p.questions.push(r);
-            if (r.type === 'summary') p.summary = r;
-            if (r.type === 'questionnaire') p.questionnaire = r;
+            const p = map.get(r.prolificId);
+            if (!p.group) p.group = grp(r);
+            switch (r.type) {
+                case 'question': p.main.push(r); break;
+                case 'posttest': p.post.push(r); break;
+                case 'delayed': p.delayed.push(r); break;
+                case 'summary': p.mainSum = r; break;
+                case 'posttest_summary': p.postSum = r; break;
+                case 'delayed_summary': p.delSum = r; break;
+                case 'questionnaire': p.questionnaire = r; break;
+            }
         });
+
+        // 某阶段的状态文字
+        const answered = list => new Set(list.map(r => r.qNumber)).size;   // 按题号去重（即时后测/延迟测试可能有多次访问）
+        const stageState = (list, sum) => sum ? '完成'
+            : (list.length ? `未完成（已答 ${answered(list)} 题）` : '未开始');
+        const rate = s => (s ? blank(s.accuracy) : '');
+        const correct = s => (s ? blank(s.correctAnswers) : '');
 
         return [...map.values()]
             .sort((a, b) => (a.group || '').localeCompare(b.group || '') || (a.id || '').localeCompare(b.id || ''))
             .map(p => {
-                const s = p.summary || {};
                 const ans = (p.questionnaire && p.questionnaire.answers) || {};
+                const s = p.mainSum || {};
+                const ps = p.postSum || {};
+                const ds = p.delSum || {};
                 const out = {
                     '参与者ID': p.id,
                     '组别': p.group,
-                    '状态': p.summary
-                        ? (p.questionnaire ? '完成（含问卷）' : '完成（无问卷）')
-                        : `未完成（已答 ${p.questions.length} 题）`,
-                    '完成时间（东京）': fmtTime(s.completedAt),
-                    '总时长（分）': s.totalDurationMs ? (s.totalDurationMs / 60000).toFixed(1) : '',
-                    '正确题数': blank(s.correctAnswers),
-                    '正确率（%）': blank(s.accuracy),
-                    '第一次即正确题数': blank(s.firstTryCorrect),
-                    '替换次数': blank(s.replaceCount),
+                    '主测试': stageState(p.main, p.mainSum),
+                    '即时后测': stageState(p.post, p.postSum),
+                    '延迟测试': stageState(p.delayed, p.delSum),
+                    '问卷': p.questionnaire ? '完成' : '未完成',
+                    '主测试完成时间（东京）': fmtTime(s.completedAt),
+                    '主测试总时长（分）': s.totalDurationMs ? (s.totalDurationMs / 60000).toFixed(1) : '',
+                    '主测试正确数': correct(p.mainSum),
+                    '主测试正确率（%）': rate(p.mainSum),
+                    '主测试第一次即正确题数': blank(s.firstTryCorrect),
+                    '主测试替换次数': blank(s.replaceCount),
+                    '即时后测正确数': correct(p.postSum),
+                    '即时后测正确率（%）': rate(p.postSum),
+                    '延迟测试正确数': correct(p.delSum),
+                    '延迟测试正确率（%）': rate(p.delSum),
+                    '即时后测总时长（分）': ps.totalDurationMs ? (ps.totalDurationMs / 60000).toFixed(1) : '',
+                    '即时后测第一次即正确题数': blank(ps.firstTryCorrect),
+                    '即时后测修改过的题数': blank(ps.revisedCount),
+                    '延迟测试总时长（分）': ds.totalDurationMs ? (ds.totalDurationMs / 60000).toFixed(1) : '',
+                    '延迟测试第一次即正确题数': blank(ds.firstTryCorrect),
+                    '延迟测试修改过的题数': blank(ds.revisedCount),
                 };
                 QLABELS.forEach(([label, key]) => { out[label] = blank(ans[key]); });
                 out['注意力检测是否通过'] = p.questionnaire
@@ -260,9 +344,14 @@
 
     const stamp = () => new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
 
-    $('attemptsBtn').onclick = () => download(`1_逐次作答_${stamp()}.csv`, toCSV(buildAttempts()), 'text/csv;charset=utf-8');
-    $('questionsBtn').onclick = () => download(`2_题目_${stamp()}.csv`, toCSV(buildQuestions()), 'text/csv;charset=utf-8');
-    $('participantsBtn').onclick = () => download(`3_参与者_${stamp()}.csv`, toCSV(buildParticipants()), 'text/csv;charset=utf-8');
+    // 一个 Excel 文件，三个 Sheet
+    $('excelBtn').onclick = () => {
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buildAttempts()), '1_逐次作答');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buildQuestions()), '2_题目');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(buildParticipants()), '3_参与者');
+        XLSX.writeFile(wb, `实验数据_${stamp()}.xlsx`);
+    };
     $('jsonBtn').onclick = () => download(`experiments_${stamp()}.json`, JSON.stringify(rows, null, 2), 'application/json');
 </script>
 </body>
