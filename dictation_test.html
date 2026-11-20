@@ -1138,14 +1138,25 @@
                                 {currentIndex === QUESTIONS.length - 1 ? 'Finish Test →' : 'Next Question →'}
                             </button>
                         )}
-                        {stage === 'posttest' && currentIndex > 0 && (
-                            <button
-                                className="button-primary"
-                                onClick={goBackPosttest}
-                                style={{ marginTop: '1rem', width: '100%', background: '#777' }}
-                            >
-                                ← Back to previous question
-                            </button>
+                        {stage === 'posttest' && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
+                                <button
+                                    className="button-primary"
+                                    onClick={goBackPosttest}
+                                    disabled={currentIndex === 0}
+                                    style={{ flex: 1, background: '#777', opacity: currentIndex === 0 ? 0.4 : 1 }}
+                                >
+                                    ← Previous question
+                                </button>
+                                <button
+                                    className="button-primary"
+                                    onClick={() => { if (userInput.trim()) handleSubmit(); }}
+                                    disabled={!userInput.trim()}
+                                    style={{ flex: 1, opacity: userInput.trim() ? 1 : 0.4 }}
+                                >
+                                    {currentIndex === QUESTIONS.length - 1 ? 'Finish →' : 'Next question →'}
+                                </button>
+                            </div>
                         )}
                     </div>
 
