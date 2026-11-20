@@ -27,7 +27,7 @@
 
         #root {
             min-height: 100vh;
-            padding: 20px;
+            padding: 80px 20px 20px;
         }
 
         .container {
@@ -234,6 +234,12 @@
             color: #1565c0;
             font-weight: 500;
         }
+        .replace-btn { display: block; margin: 16px 0 0 auto; }
+        .diff-label { font-size: 14px; color: #666; font-weight: 600; margin: 12px 0 6px; }
+        .diff-row { font-family: Monaco, Consolas, monospace; font-size: 22px; white-space: nowrap; overflow-x: auto; }
+        .diff-cell { display: inline-block; min-width: 14px; text-align: center; }
+        .diff-sep { color: #bbb; margin: 0 4px; }
+        .diff-bad { color: #d32f2f; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -265,7 +271,7 @@
             console.error('Firebase error:', error);
         }
 
-        const QUESTIONS = [
+        const QUESTIONS_BASE = [
             { word: 'concede', sentence: 'The government has ________ that the new tax policy has been a disaster.', accept: ['concede', 'conceded'] },
             { word: 'honorary', sentence: 'He\'s got a lot of ________ degrees and awards from educational establishments worldwide.' },
             { word: 'accumulate', sentence: 'As people ________ more wealth, they tend to spend a greater proportion of their incomes.' },
@@ -317,6 +323,10 @@
             { word: 'definitely', sentence: 'He ________ said he\'d be here.' },
             { word: 'occurrence', sentence: 'Death was an everyday ________ during the Civil War.' }
         ];
+        // 主测试顺序 = 原始顺序；即时后测使用固定的替代顺序（同一批单词、音频和句子，只改变出现顺序）
+        const QUESTIONS = QUESTIONS_BASE;
+        const POST_ORDER = [38, 30, 49, 4, 20, 14, 47, 35, 15, 5, 36, 17, 16, 41, 40, 46, 7, 0, 31, 42, 34, 32, 25, 12, 45, 11, 22, 3, 1, 9, 2, 48, 10, 21, 23, 29, 44, 19, 39, 43, 27, 6, 26, 8, 13, 18, 24, 33, 37, 28];
+        const POST_QUESTIONS = POST_ORDER.map(i => QUESTIONS_BASE[i]);
 
         // 只接受指定的形式：8 个空格允许过去式/原型或单数/复数，其余只接受原词
         function getAllWordForms(word) {
@@ -442,21 +452,27 @@
             // 日志：qlog = 当前题的过程记录；records = 已完成题的记录；uploadQueue = 待上传队列
             const qlog = useRef(null);
             const records = useRef([]);
+            const postRecords = useRef([]);
+            const postAnswers = useRef([]);
+            const pendingReturn = useRef(null);
+            const postStartedAt = useRef(0);
             const uploadQueue = useRef([]);
 
-            const currentQuestion = QUESTIONS[currentIndex];
+            const activeQuestions = stage === 'posttest' ? POST_QUESTIONS : QUESTIONS;
+            const currentQuestion = activeQuestions[currentIndex];
             const progress = ((currentIndex + 1) / QUESTIONS.length) * 100;
 
             useEffect(() => {
-                if (stage !== 'task') return;
+                if (stage !== 'task' && stage !== 'posttest') return;
                 qlog.current = {
                     qNumber: currentIndex + 1,
-                    targetWord: QUESTIONS[currentIndex].word,
+                    targetWord: activeQuestions[currentIndex].word,
                     shownAt: Date.now(),
                     submissions: [],
                     replace: null,
-                    events: [],
+                    events: pendingReturn.current ? [pendingReturn.current] : [],
                 };
+                pendingReturn.current = null;
 
                 if (inputRef.current) {
                     setTimeout(() => inputRef.current && inputRef.current.focus(), 100);
@@ -575,6 +591,85 @@
                 };
             };
 
+            // 即时后测 / 延迟测试：没有反馈；可以返回上一题修改；每次离开一题（Enter 或返回）都上传一次记录
+            const saveVisit = (leaveAction) => {
+                const log = qlog.current;
+                if (!log) return;
+                const leftAt = Date.now();
+                if (leaveAction === 'back') {
+                    log.events.push({ t: leftAt, type: 'back', before: userInput });
+                } else {
+                    log.events.push({ t: leftAt, type: 'next', finalAnswer: userInput });
+                }
+                const prev = postAnswers.current[currentIndex] || { visits: 0, submissionCount: 0, firstCorrect: null, finalInput: '', finalCorrect: false };
+                prev.visits += 1;
+                prev.submissionCount += log.submissions.length;
+                if (log.submissions.length) {
+                    if (prev.firstCorrect === null) prev.firstCorrect = log.submissions[0].correct;
+                    const last = log.submissions[log.submissions.length - 1];
+                    prev.finalInput = last.input;
+                    prev.finalCorrect = last.correct;
+                }
+                postAnswers.current[currentIndex] = prev;
+                enqueueUpload({
+                    type: 'posttest',
+                    group: 'control',
+                    prolificId: prolificId.current,
+                    studyId: studyInfo.current.studyId,
+                    sessionId: studyInfo.current.sessionId,
+                    qNumber: log.qNumber,
+                    targetWord: log.targetWord,
+                    visit: prev.visits,
+                    leaveAction: leaveAction,
+                    submissions: log.submissions,
+                    events: log.events,
+                });
+                qlog.current = null;
+            };
+
+            const goBackPosttest = () => {
+                if (stage !== 'posttest' || currentIndex === 0) return;
+                saveVisit('back');
+                const target = currentIndex - 1;
+                const prevAnswer = postAnswers.current[target];
+                pendingReturn.current = { t: Date.now(), type: 'return', restored: prevAnswer ? prevAnswer.finalInput : '' };
+                setCurrentIndex(target);
+                setUserInput(prevAnswer ? prevAnswer.finalInput : '');
+                setFeedback(null);
+            };
+
+            const advancePosttest = () => {
+                const nextAt = Date.now();
+                saveVisit('next');
+                if (currentIndex === QUESTIONS.length - 1) {
+                    const answers = postAnswers.current.filter(Boolean);
+                    const correctCount = answers.filter(a => a.finalCorrect).length;
+                    const finalPost = {
+                        type: 'posttest_summary',
+                        group: 'control',
+                        prolificId: prolificId.current,
+                        studyId: studyInfo.current.studyId,
+                        sessionId: studyInfo.current.sessionId,
+                        startedAt: postStartedAt.current,
+                        completedAt: nextAt,
+                        totalDurationMs: nextAt - postStartedAt.current,
+                        totalQuestions: QUESTIONS.length,
+                        correctAnswers: correctCount,
+                        firstTryCorrect: answers.filter(a => a.firstCorrect === true).length,
+                        revisedCount: answers.filter(a => a.submissionCount > 1).length,
+                        accuracy: Math.round((correctCount / QUESTIONS.length) * 100),
+                        userAgent: navigator.userAgent,
+                    };
+                    enqueueUpload(finalPost);
+                    setStage('questionnaire');
+                } else {
+                    const nextIdx = currentIndex + 1;
+                    const nextAnswer = postAnswers.current[nextIdx];
+                    setCurrentIndex(nextIdx);
+                    setUserInput(nextAnswer ? nextAnswer.finalInput : '');
+                }
+            };
+
             // ---------- 交互 ----------
             const handleKeyPress = (e) => {
                 if (e.key === 'Enter') {
@@ -598,6 +693,11 @@
                     qlog.current.events.push({
                         t: now, type: 'enter', before: userInput, after: userInput, correct: isCorrect,
                     });
+                }
+
+                if (stage === 'posttest') {
+                    advancePosttest();
+                    return;
                 }
 
                 if (isCorrect) {
@@ -653,7 +753,10 @@
                     };
                     enqueueUpload({ type: 'summary', ...finalSummary });
                     setSummary(finalSummary);
-                    setStage('questionnaire');
+                    setCurrentIndex(0);
+                    setUserInput('');
+                    setFeedback(null);
+                    setStage('transition');
                 } else {
                     setCurrentIndex(currentIndex + 1);
                     setUserInput('');
@@ -847,17 +950,42 @@
                 );
             }
 
+            // ========== 转换页：有反馈的测试结束 → 无反馈的听力测试 ==========
+            if (stage === 'transition') {
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <div className="completion-screen">
+                                <h2>Next: Listening Test (50 questions)</h2>
+                                <p style={{ fontSize: '16px', color: '#666', marginTop: '0.75rem', lineHeight: 1.6 }}>
+                                    The next part has 50 more spelling questions. There is <b>no feedback</b> in this part.
+                                    You may go back to the previous question with the Back button to correct an answer. Press Enter to save each answer and move on.
+                                </p>
+                                <button
+                                    className="button-primary"
+                                    onClick={() => { postStartedAt.current = Date.now(); setStage('posttest'); }}
+                                    style={{ marginTop: '1.5rem', background: '#1976d2' }}
+                                >
+                                    Start
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             // 答题页面
             return (
                 <div className="container">
-                    <div className="banner">🌐 Online Experiment - 50 Questions</div>
+                    {stage === 'posttest' ? <div className="banner">📝 POST-TEST - 50 Questions (no feedback)</div> : <div className="banner">🌐 Online Experiment - 50 Questions</div>}
 
                     <div className="progress-bar">
                         <div className="progress-fill" style={{ width: `${progress}%` }}></div>
                     </div>
 
                     <div className="card">
-                        <div className="question-number">Question {currentIndex + 1} of {QUESTIONS.length}</div>
+                        <div className="question-number">{stage === 'posttest' ? 'Post-test · ' : ''}Question {currentIndex + 1} of {QUESTIONS.length}</div>
 
                         <div className="audio-controls">
                             <button 
@@ -894,24 +1022,14 @@
 
                         {feedback && feedback.type === 'spelling_error' && (
                             <div className="feedback-section">
-                                <div style={{ fontSize: '14px', marginBottom: '0.75rem', color: '#666', fontWeight: '600' }}>
-                                    Your spelling:
-                                </div>
-                                <div style={{ marginBottom: '1.5rem', fontSize: '20px', fontFamily: 'Monaco, monospace' }}>
-                                    {userInput}
-                                </div>
-
-                                <div style={{ fontSize: '14px', marginBottom: '0.75rem', color: '#666', fontWeight: '600' }}>
-                                    Correct spelling:
-                                </div>
-                                <div style={{ marginBottom: '1rem', fontSize: '20px', fontFamily: 'Monaco, monospace' }}>
-                                    {currentQuestion.word}
-                                </div>
+                                <div className="diff-label">Your spelling:</div>
+                                <div className="diff-row">{userInput}</div>
+                                <div className="diff-label">Correct spelling:</div>
+                                <div className="diff-row">{currentQuestion.word}</div>
                                 <button
-                                    className="button-primary"
+                                    className="button-primary replace-btn"
                                     onClick={handleReplaceWithCorrect}
-                                    style={{ marginTop: '1rem', background: '#1976d2' }}
-                                >
+                                    style={{ background: '#1976d2' }}>
                                     🔁 Replace with correct spelling
                                 </button>
                             </div>
@@ -926,10 +1044,19 @@
                                 {currentIndex === QUESTIONS.length - 1 ? 'Finish Experiment →' : 'Next Question →'}
                             </button>
                         )}
+                        {stage === 'posttest' && currentIndex > 0 && (
+                            <button
+                                className="button-primary"
+                                onClick={goBackPosttest}
+                                style={{ marginTop: '1rem', width: '100%', background: '#777' }}
+                            >
+                                ← Back to previous question
+                            </button>
+                        )}
                     </div>
 
                     <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: '1rem' }}>
-                        {stats.correct} / {Math.max(stats.total, 1)} correct
+                        {stage === 'task' ? `${stats.correct} / ${Math.max(stats.total, 1)} correct` : ''}
                     </div>
                 </div>
             );
