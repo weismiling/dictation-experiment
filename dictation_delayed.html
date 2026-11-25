@@ -422,7 +422,7 @@
         ];
 
         // 问卷完成后跳转到 Prolific 完成页面（把 XXXXXXXX 替换为你的完成码）
-        const PROLIFIC_COMPLETION_URL = 'https://app.prolific.com/submissions/complete?cc=XXXXXXXX';
+        const PROLIFIC_COMPLETION_URL = 'https://app.prolific.com/submissions/complete?cc=CVO52RJP';
 
         function DictationOnline() {
             const [currentIndex, setCurrentIndex] = useState(0);
@@ -824,22 +824,21 @@
                     <div className="container">
                         <div className="banner">🌐 Online Experiment</div>
                         <div className="card">
-                            <h2 style={{ marginBottom: '1.25rem' }}>Follow-up Spelling Test</h2>
+                            <h2 style={{ marginBottom: '1.25rem' }}>Welcome to the Follow-up Spelling Test</h2>
 
-                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>📋 Experiment Instructions:</h3>
-                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
-                                <li>Duration: About 5-10 minutes</li>
-                                <li>Task: Listen to 50 audio clips and fill in the missing word</li>
-                                <li>Each audio plays automatically and can be replayed as many times as needed</li>
-                                <li>There is no feedback. You may go back to the previous question with the Back button to correct an answer; pressing Enter saves each answer and moves on</li>
-                                <li>Use headphones or speakers for clear audio</li>
-                            </ul>
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 15 minutes</p>
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
 
-                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>⚠️ Important Notes:</h3>
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear 50 words and type each one into a sentence. There is no feedback in this test.</p>
+
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
+
+                                                        <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>Notes:</h3>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
-                                <li>Please ensure you have a stable internet connection</li>
-                                <li>Complete the test in one session without refreshing</li>
-                                <li>Your responses will be automatically saved</li>
+                                <li>Keep a stable internet connection.</li>
+                                <li><b>Do not refresh the page. Complete the study in one session.</b></li>
+                                <li>While answering, do not use a spell checker, reference materials, or look up words online.</li>
+                                <li>Your answers and the timing of your typing and clicks are recorded for research only.</li>
                             </ul>
 
                             <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
