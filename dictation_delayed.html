@@ -826,23 +826,23 @@
                         <div className="card">
                             <h2 style={{ marginBottom: '1.25rem' }}>Welcome to the Follow-up Spelling Test</h2>
 
-                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 15 minutes</p>
-                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 15 minutes</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
 
-                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear 50 words and type each one into a sentence. There is no feedback in this test.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear 50 words and type each one into a sentence. There is no feedback in this test.</p>
 
-                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
 
-                                                        <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>Notes:</h3>
-                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
+                                                        <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>Notes:</h3>
+                            <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '19px', marginBottom: '1.25rem' }}>
                                 <li>Keep a stable internet connection.</li>
                                 <li><b>Do not refresh the page. Complete the study in one session.</b></li>
                                 <li>While answering, do not use a spell checker, reference materials, or look up words online.</li>
                                 <li>Your answers and the timing of your typing and clicks are recorded for research only.</li>
                             </ul>
 
-                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
-                            <p style={{ fontSize: '14px', color: '#666', marginBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
+                            <p style={{ fontSize: '17px', color: '#666', marginBottom: '0.75rem' }}>
                                 This ID is provided by Prolific and is required to receive payment.
                             </p>
                             <input
@@ -975,6 +975,10 @@
                             <input
                                 ref={inputRef}
                                 type="text"
+                                spellCheck={false}
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
                                 value={userInput}
                                 onChange={(e) => {
                                     setUserInput(e.target.value);
