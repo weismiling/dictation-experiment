@@ -126,12 +126,13 @@
             (a.qNumber || 0) - (b.qNumber || 0) || (a.completedAt || 0) - (b.completedAt || 0));
 
     // ---------- ① 逐次作答表 ----------
+    const secs = ms => Math.round(ms / 100) / 10;   // 毫秒 → 秒，保留一位小数
     function buildAttempts() {
         const out = [];
         questionRows().forEach(q => {
             const events = (q.events || []).slice().sort((a, b) => a.t - b.t);
             let segment = [];              // 两次操作之间的输入变化
-            let lastT = q.shownAt;
+            let lastT = typeof q.shownAt === 'number' ? q.shownAt : null;   // 即时后测/延迟测试的访问记录没有题目出现时刻
             let enterCount = 0;
             events.forEach(ev => {
                 if (ev.type === 'input') { segment.push(ev.value); return; }
@@ -166,8 +167,8 @@
                     '离开方式': blank(q.leaveAction),
                     '操作': action,
                     '时间（东京）': fmtTime(ev.t),
-                    '距题目出现（ms）': ev.t - q.shownAt,
-                    '与上一操作间隔（ms）': ev.t - lastT,
+                    '距题目出现（秒）': typeof q.shownAt === 'number' ? secs(ev.t - q.shownAt) : '',
+                    '与上一操作间隔（秒）': lastT === null ? '' : secs(ev.t - lastT),
                     '修改过程（上次操作后的输入）': segment.join(' → '),
                     '操作前答案': blank(before),
                     '操作后答案': blank(after),
@@ -240,14 +241,29 @@
 
     // ---------- ③ 参与者表 ----------
     const QLABELS = [
-        ['年龄', 'age'], ['性别', 'gender'], ['母语', 'native_language'],
-        ['英语水平', 'english_level'], ['学英语年数', 'english_years'],
-        ['读写英语频率', 'english_use'], ['听音设备', 'audio_device'],
-        ['环境噪音', 'noise'], ['使用其他工具', 'tool_use'],
-        ['任务难度', 'difficulty'], ['拼写信心', 'confidence'],
-        ['替换按钮是否有用', 'replace_helpful'], ['技术问题', 'technical'],
-        ['备注', 'comments'],
+        ['主测试错误题数（自评）', 'errors_count'],
+        ['拼写能力自评（1-7）', 'self_rating'],
+        ['改正方式（A自己打出 / B看答案后Replace / C直接Replace，合计100）', 'correction'],
+        ['偏好的反馈方式', 'feedback_pref'],
+        ['偏好A的原因', 'reason_A'],
+        ['偏好B的原因', 'reason_B'],
+        ['平时使用拼写检查频率', 'spellcheck_freq'],
+        ['作答时使用的辅助工具', 'tools_used'],
+        ['第二部分答题信心（1-7）', 'confidence_part2'],
+        ['音频清晰度（1-5）', 'audio_clear'],
+        ['播放问题说明', 'audio_problem'],
+        ['其他意见', 'comments'],
     ];
+
+    // 问卷答案的格式化（多选、其他、比例分配）
+    function fmtAns(ans, key) {
+        const v = ans[key];
+        if (v === undefined || v === null) return '';
+        if (key === 'correction' && Array.isArray(v)) return `A ${v[0] || 0}% / B ${v[1] || 0}% / C ${v[2] || 0}%`;
+        if (Array.isArray(v)) return v.map(x => (x === 'other' ? `其他：${ans[key + '_other'] || ''}` : x)).join('；');
+        if (v === 'other') return `其他：${ans[key + '_other'] || ''}`;
+        return v;
+    }
 
     function buildParticipants() {
         // 以 Prolific ID 为主键（延迟测试的记录组别不可靠，不能用「组别|ID」分组）
@@ -258,7 +274,7 @@
                 map.set(r.prolificId, {
                     id: r.prolificId, group: grp(r),
                     main: [], post: [], delayed: [],
-                    mainSum: null, postSum: null, delSum: null, questionnaire: null,
+                    mainSum: null, postSum: null, delSum: null, questionnaire: null, qParts: [],
                 });
             }
             const p = map.get(r.prolificId);
@@ -270,7 +286,10 @@
                 case 'summary': p.mainSum = r; break;
                 case 'posttest_summary': p.postSum = r; break;
                 case 'delayed_summary': p.delSum = r; break;
-                case 'questionnaire': p.questionnaire = r; break;
+                case 'questionnaire':
+                    p.qParts.push(r.part || '');
+                    p.questionnaire = { answers: { ...((p.questionnaire && p.questionnaire.answers) || {}), ...(r.answers || {}) } };
+                    break;
             }
         });
 
@@ -294,7 +313,7 @@
                     '主测试': stageState(p.main, p.mainSum),
                     '即时后测': stageState(p.post, p.postSum),
                     '延迟测试': stageState(p.delayed, p.delSum),
-                    '问卷': p.questionnaire ? '完成' : '未完成',
+                    '问卷': p.qParts.length >= 2 ? '完成' : (p.qParts.length ? `部分完成（缺 ${p.qParts.includes('A') ? 'B' : 'A'}）` : '未完成'),
                     '主测试完成时间（东京）': fmtTime(s.completedAt),
                     '主测试总时长（分）': s.totalDurationMs ? (s.totalDurationMs / 60000).toFixed(1) : '',
                     '主测试正确数': correct(p.mainSum),
@@ -312,7 +331,7 @@
                     '延迟测试第一次即正确题数': blank(ds.firstTryCorrect),
                     '延迟测试修改过的题数': blank(ds.revisedCount),
                 };
-                QLABELS.forEach(([label, key]) => { out[label] = blank(ans[key]); });
+                QLABELS.forEach(([label, key]) => { out[label] = fmtAns(ans, key); });
                 out['注意力检测是否通过'] = p.questionnaire
                     ? (ans.attention === 'Somewhat agree' ? '通过' : '未通过') : '';
                 return out;
