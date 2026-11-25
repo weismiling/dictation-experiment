@@ -471,7 +471,7 @@
         ];
 
         // 问卷完成后跳转到 Prolific 完成页面（把 XXXXXXXX 替换为你的完成码）
-        const PROLIFIC_COMPLETION_URL = 'https://app.prolific.com/submissions/complete?cc=XXXXXXXX';
+        const PROLIFIC_COMPLETION_URL = 'https://app.prolific.com/submissions/complete?cc=CY43E7JD';
 
         // 差异高亮：最少修改次数对齐（替换/删除/插入各算 1 次，平局时优先替换）
         function buildDiffOps(correctWord, inputWord) {
@@ -901,24 +901,26 @@
                     <div className="container">
                         <div className="test-banner">🧪 TEST MODE</div>
                         <div className="card">
-                            <h2 style={{ marginBottom: '1.25rem' }}>Welcome to Audio Listening Experiment</h2>
+                            <h2 style={{ marginBottom: '1.25rem' }}>Welcome to the Audio Listening Experiment</h2>
 
-                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>📋 Experiment Instructions:</h3>
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 30–40 minutes</p>
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
+
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear a word and type it into a sentence.</p>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
-                                <li>Duration: Approximately 20-30 minutes</li>
-                                <li>Structure: 100 audio questions in 2 phases (50 each)</li>
-                                <li>Task: Listen to audio and fill in the missing word</li>
-                                <li>Audio: Each audio will auto-play after 1 second and can be replayed as many times as needed</li>
-                                <li>Requirements: Use headphones for best audio quality</li>
+                                <li><b>Part 1 (50 questions):</b> you get feedback after each answer. If your answer is wrong, you can click "Replace with correct spelling" to fill in the correct word, or type the correct spelling again.</li>
+                                <li><b>Part 2 (50 questions):</b> no feedback.</li>
+                                <li>A short questionnaire at the end.</li>
                             </ul>
+                            <p style={{ fontSize: '16px', lineHeight: 1.6, marginBottom: '0.75rem' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
 
-                            <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>⚠️ Important Notes:</h3>
+                                                        <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>Notes:</h3>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '16px', marginBottom: '1.25rem' }}>
-                                <li>To confirm task completion and analyze participant behavior, this experiment records all mouse clicks and interactions. The data will be used solely for research purposes.</li>
-                                <li>Please ensure you have a stable internet connection</li>
-                                <li>Use headphones or speakers for clear audio</li>
-                                <li>Complete the experiment in one session without refreshing</li>
-                                <li>Your responses will be automatically saved</li>
+                                <li>Keep a stable internet connection.</li>
+                                <li><b>Do not refresh the page. Complete the study in one session.</b></li>
+                                <li>While answering, do not use a spell checker, reference materials, or look up words online.</li>
+                                <li>Your answers and the timing of your typing and clicks are recorded for research only.</li>
+                                <li><b>You may be invited to a short follow-up test about 2 weeks later.</b></li>
                             </ul>
 
                             <h3 style={{ fontSize: '18px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
