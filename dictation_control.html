@@ -240,7 +240,7 @@
         .diff-cell { display: inline-block; min-width: 14px; text-align: center; }
         .diff-sep { color: #bbb; margin: 0 4px; }
         .diff-bad { color: #d32f2f; font-weight: 700; }
-        .word-bad { color: #d32f2f; font-weight: 700; text-decoration: underline wavy #d32f2f; text-underline-offset: 6px; }
+        .word-bad { display: inline-block; padding-bottom: 6px; color: #1a1a1a; font-weight: 400; text-decoration: underline wavy #d32f2f; text-underline-offset: 4px; text-decoration-thickness: 1px; }
     </style>
 </head>
 <body>
@@ -964,24 +964,23 @@
                         <div className="card">
                             <h2 style={{ marginBottom: '1.25rem' }}>Welcome to the Audio Listening Experiment</h2>
 
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 30 minutes</p>
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 40 minutes</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use <b>a desktop computer, with headphones,</b> in a quiet place.</p>
 
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear a word and type it into a sentence.</p>
+                                                        <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear a word and type it into a sentence. The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '19px', marginBottom: '1.25rem' }}>
-                                <li><b>Part 1 (50 questions):</b> you get feedback after each answer. If your answer is wrong, you can click "Replace with correct spelling" to fill in the correct word, or type the correct spelling again.</li>
-                                <li><b>Part 2 (50 questions):</b> no feedback.</li>
-                                <li>A short questionnaire at the end.</li>
+                                <li>Part 1 (50 questions): <b><u>you get feedback after each answer.</u></b> If your answer is wrong, you can click "Replace with correct spelling" to fill in the correct word, or type the correct spelling again.</li>
+                                <li>Part 2 (50 questions): <b><u>no feedback.</u></b></li>
+                                <li>There is a short questionnaire after Part 1, and another short questionnaire after Part 2.</li>
                             </ul>
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
 
-                                                        <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>Notes:</h3>
+<h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>Notes:</h3>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '19px', marginBottom: '1.25rem' }}>
                                 <li>Keep a stable internet connection.</li>
-                                <li><b>Do not refresh the page. Complete the study in one session.</b></li>
+                                <li><b><u>Do not refresh the page.</u></b> Complete the study in one session.</li>
                                 <li>While answering, do not use a spell checker, reference materials, or look up words online.</li>
-                                <li>Your answers and the timing of your typing and clicks are recorded for research only.</li>
-                                <li><b>You may be invited to a short follow-up test about 2 weeks later.</b></li>
+                                <li><b><u>Your answers and the timing of your typing and clicks are recorded for research only.</u></b></li>
+                                <li><b><u>You may be invited to a short follow-up test about 2 weeks later.</u></b></li>
                             </ul>
 
                             <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
