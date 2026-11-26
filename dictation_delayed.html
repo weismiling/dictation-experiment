@@ -822,18 +822,18 @@
             if (stage === 'intro') {
                 return (
                     <div className="container">
-                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="banner">Follow-up Spelling Test</div>
                         <div className="card">
-                            <h2 style={{ marginBottom: '1.25rem', textAlign: 'center' }}>Welcome to the Follow-up Spelling Test</h2>
+                            <h2 style={{ marginBottom: '1.25rem' }}>Welcome to the Follow-up Spelling Test</h2>
 
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}><b>Time:</b> about 15 minutes</p>
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 15 minutes</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use a desktop computer, with headphones, in a quiet place.</p>
 
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>You will hear 50 words and type each one into a sentence. There is no feedback in this test.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear 50 words and type each one into a sentence. There is no feedback in this test.</p>
 
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
 
-                                                        <h3 style={{ fontSize: '21px', marginBottom: '0.5rem', textAlign: 'center' }}>Notes:</h3>
+                                                        <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>Notes:</h3>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '19px', marginBottom: '1.25rem' }}>
                                 <li>Keep a stable internet connection.</li>
                                 <li><b>Do not refresh the page. Complete the study in one session.</b></li>
@@ -841,8 +841,8 @@
                                 <li>Your answers and the timing of your typing and clicks are recorded for research only.</li>
                             </ul>
 
-                            <h3 style={{ fontSize: '21px', marginBottom: '0.5rem', textAlign: 'center' }}>🆔 Please enter your Prolific ID:</h3>
-                            <p style={{ fontSize: '19px', color: '#1a1a1a', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>
+                            <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
+                            <p style={{ fontSize: '19px', color: '#1a1a1a', lineHeight: 1.6, marginBottom: '0.75rem' }}>
                                 This ID is provided by Prolific and is required to receive payment.
                             </p>
                             <input
@@ -870,7 +870,7 @@
                 const allAnswered = QUESTIONNAIRE.every(q => q.optional || (answers[q.id] && answers[q.id] !== ''));
                 return (
                     <div className="container">
-                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="banner">Follow-up Spelling Test</div>
                         <div className="card">
                             <h2 style={{ marginBottom: '0.5rem' }}>Final Questionnaire</h2>
                             <p style={{ fontSize: '15px', color: '#1a1a1a', marginBottom: '1.5rem' }}>
@@ -922,7 +922,7 @@
                 const failed = uploadState.pending > 0 && uploadState.sending === 0;
                 return (
                     <div className="container">
-                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="banner">Follow-up Spelling Test</div>
                         <div className="card">
                             <div className="completion-screen">
                                 <h2>Saving your responses...</h2>
@@ -951,7 +951,7 @@
             // 答题页面
             return (
                 <div className="container">
-                    {stage === 'posttest' ? <div className="banner">📝 FOLLOW-UP TEST - 50 Questions (no feedback)</div> : <div className="banner">🌐 Follow-up Spelling Test - 50 Questions</div>}
+                    {stage === 'posttest' ? <div className="banner">Follow-up Test · 50 Questions (no feedback)</div> : <div className="banner">Follow-up Spelling Test · 50 Questions</div>}
 
                     <div className="progress-bar">
                         <div className="progress-fill" style={{ width: `${progress}%` }}></div>
