@@ -397,10 +397,10 @@
 
         // 问卷 A：主测试结束后、即时后测之前
         const QUESTIONNAIRE_A = [
-            { id: 'errors_count', type: 'single', text: 'In the first part (with feedback), about how many words did you get wrong?',
-              options: ['0–4', '5–9', '10–14', '15–19', '20–29', '30–39', '40 or more'] },
             { id: 'self_rating', type: 'single', text: 'How would you rate your own spelling ability?',
               options: ['1 - Very poor', '2', '3', '4', '5', '6', '7 - Very good'] },
+            { id: 'errors_count', type: 'single', text: 'In the first part (with feedback), about how many words did you get wrong?',
+              options: ['0–4', '5–9', '10–14', '15–19', '20–29', '30–39', '40 or more'] },
             { id: 'correction', type: 'constant', text: 'When you got a word wrong, how did you usually correct it? The three numbers must add up to 100.',
               items: ['I typed the correct spelling myself',
                       'I looked at the correct spelling, then clicked "Replace with correct spelling"',
@@ -603,7 +603,7 @@
                                 )}
                                 {o.img && (
                                     <div style={{ marginTop: '6px' }}>
-                                        <img src={o.img} alt={o.label} style={{ maxWidth: '100%', border: '1px solid #ddd', borderRadius: '6px' }} />
+                                        <img src={o.img} alt={o.label} style={{ width: '50%', border: '1px solid #ddd', borderRadius: '6px' }} />
                                     </div>
                                 )}
                             </label>
@@ -619,7 +619,7 @@
                         <div className="banner">🌐 Online Experiment</div>
                         <div className="card">
                             <h2 style={{ marginBottom: '0.5rem' }}>{title}</h2>
-                            <p style={{ fontSize: '16px', color: '#666', marginBottom: '1.5rem', lineHeight: 1.6 }}>{intro}</p>
+                            <p style={{ fontSize: '16px', color: '#1a1a1a', marginBottom: '1.5rem', lineHeight: 1.6 }}>{intro}</p>
                             {visible.map((q, idx) => (
                                 <div key={q.id} style={{ marginBottom: '1.5rem' }}>
                                     <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '17px' }}>
@@ -896,7 +896,7 @@
                     setCurrentIndex(0);
                     setUserInput('');
                     setFeedback(null);
-                    setStage('questionnaireA');
+                    setStage('transitionA');
                 } else {
                     setCurrentIndex(currentIndex + 1);
                     setUserInput('');
@@ -962,19 +962,19 @@
                     <div className="container">
                         <div className="banner">🌐 Online Experiment</div>
                         <div className="card">
-                            <h2 style={{ marginBottom: '1.25rem' }}>Welcome to the Audio Listening Experiment</h2>
+                            <h2 style={{ marginBottom: '1.25rem', textAlign: 'center' }}>Welcome to the Audio Listening Experiment</h2>
 
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}><b>Time:</b> about 40 minutes</p>
-                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>Please use <b>a desktop computer, with headphones,</b> in a quiet place.</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}><b>Time:</b> about 40 minutes</p>
+                            <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>Please use <b>a desktop computer, with headphones,</b> in a quiet place.</p>
 
-                                                        <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem' }}>You will hear a word and type it into a sentence. The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
+                                                        <p style={{ fontSize: '19px', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>You will hear a word and type it into a sentence. The audio plays automatically when each question appears. If it does not play, click "Play Audio". You can replay it as many times as you like.</p>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '19px', marginBottom: '1.25rem' }}>
                                 <li>Part 1 (50 questions): <b><u>you get feedback after each answer.</u></b> If your answer is wrong, you can click "Replace with correct spelling" to fill in the correct word, or type the correct spelling again.</li>
                                 <li>Part 2 (50 questions): <b><u>no feedback.</u></b></li>
                                 <li>There is a short questionnaire after Part 1, and another short questionnaire after Part 2.</li>
                             </ul>
 
-<h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>Notes:</h3>
+<h3 style={{ fontSize: '21px', marginBottom: '0.5rem', textAlign: 'center' }}>Notes:</h3>
                             <ul style={{ paddingLeft: '1.25rem', lineHeight: 1.8, fontSize: '19px', marginBottom: '1.25rem' }}>
                                 <li>Keep a stable internet connection.</li>
                                 <li><b><u>Do not refresh the page.</u></b> Complete the study in one session.</li>
@@ -983,8 +983,8 @@
                                 <li><b><u>You may be invited to a short follow-up test about 2 weeks later.</u></b></li>
                             </ul>
 
-                            <h3 style={{ fontSize: '21px', marginBottom: '0.5rem' }}>🆔 Please enter your Prolific ID:</h3>
-                            <p style={{ fontSize: '17px', color: '#666', marginBottom: '0.75rem' }}>
+                            <h3 style={{ fontSize: '21px', marginBottom: '0.5rem', textAlign: 'center' }}>🆔 Please enter your Prolific ID:</h3>
+                            <p style={{ fontSize: '19px', color: '#1a1a1a', lineHeight: 1.6, marginBottom: '0.75rem', textAlign: 'center' }}>
                                 This ID is provided by Prolific and is required to receive payment.
                             </p>
                             <input
@@ -1007,6 +1007,30 @@
                 );
             }
 
+            // ========== 过渡页：有反馈的测试结束 → 问卷 A ==========
+            if (stage === 'transitionA') {
+                return (
+                    <div className="container">
+                        <div className="banner">🌐 Online Experiment</div>
+                        <div className="card">
+                            <div className="completion-screen">
+                                <h2>Next: a short questionnaire</h2>
+                                <p style={{ fontSize: '19px', color: '#1a1a1a', marginTop: '0.75rem', lineHeight: 1.6 }}>
+                                    Part 1 is finished. Please answer a few short questions about this part. Click Continue when you are ready.
+                                </p>
+                                <button
+                                    className="button-primary"
+                                    onClick={() => setStage('questionnaireA')}
+                                    style={{ marginTop: '1.5rem', background: '#1976d2' }}
+                                >
+                                    Continue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
             // ========== 问卷 A（主测试结束后，即时后测之前） ==========
             if (stage === 'questionnaireA') {
                 return renderQuestionnaire(QUESTIONNAIRE_A, 'Questionnaire (1 of 2)',
@@ -1022,7 +1046,7 @@
                         <div className="card">
                             <div className="completion-screen">
                                 <h2>Next: a few short questions</h2>
-                                <p style={{ fontSize: '18px', color: '#666', marginTop: '0.75rem', lineHeight: 1.6 }}>
+                                <p style={{ fontSize: '19px', color: '#1a1a1a', marginTop: '0.75rem', lineHeight: 1.6 }}>
                                     The test is finished. Please answer a few short questions about your experience. Click Continue when you are ready.
                                 </p>
                                 <button
@@ -1054,7 +1078,7 @@
                         <div className="card">
                             <div className="completion-screen">
                                 <h2>Saving your responses...</h2>
-                                <p style={{ fontSize: '16px', color: '#666', marginTop: '0.75rem' }}>
+                                <p style={{ fontSize: '16px', color: '#1a1a1a', marginTop: '0.75rem' }}>
                                     Please keep this page open until the save is complete.
                                 </p>
                                 {renderUploadStatus()}
@@ -1067,7 +1091,7 @@
                                         💾 Download backup (JSON)
                                     </button>
                                 )}
-                                <p style={{ marginTop: '2rem', fontSize: '11px', color: '#666' }}>
+                                <p style={{ marginTop: '2rem', fontSize: '11px', color: '#1a1a1a' }}>
                                     Participant ID: {prolificId.current}
                                 </p>
                             </div>
@@ -1084,7 +1108,7 @@
                         <div className="card">
                             <div className="completion-screen">
                                 <h2>Next: Listening Test (50 questions)</h2>
-                                <p style={{ fontSize: '16px', color: '#666', marginTop: '0.75rem', lineHeight: 1.6 }}>
+                                <p style={{ fontSize: '19px', color: '#1a1a1a', marginTop: '0.75rem', lineHeight: 1.6 }}>
                                     The next part has 50 more spelling questions. There is <b>no feedback</b> in this part.
                                     You may go back to the previous question with the Back button to correct an answer. Press Enter to save each answer and move on.
                                 </p>
@@ -1196,7 +1220,7 @@
                         )}
                     </div>
 
-                    <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: '1rem' }}>
+                    <div style={{ textAlign: 'center', fontSize: '14px', color: '#1a1a1a', marginTop: '1rem' }}>
                         {stage === 'task' ? `${stats.correct} / ${Math.max(stats.total, 1)} correct` : ''}
                     </div>
                 </div>
